@@ -852,8 +852,8 @@ async function generate() {
 
   try {
     if (isCombined) {
-      // Fetch both batting and pitching data in parallel
-      const baseParams = { pos: 'all', lg: 'all', qual: '0', type: '4', season, season1: season, month: '0', ind: '0', hand: '', team: '0', pageitems: '10000', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
+      // Fetch team-level batting and pitching data in parallel using team=0,ts
+      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, month: '0', ind: '0', hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
       const [batResp, pitResp] = await Promise.all([
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'bat' })}`),
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'pit' })}`)
@@ -863,12 +863,8 @@ async function generate() {
       if (batJson.error) throw new Error(batJson.error);
       if (pitJson.error) throw new Error(pitJson.error);
 
-      // Aggregate each by team
-      currentMode = 'hitting';
-      const hitTeams = aggregateByTeam(batJson.data || []);
-      currentMode = 'pitching';
-      const pitTeams = aggregateByTeam(pitJson.data || []);
-      currentMode = 'combined';
+      const hitTeams = (batJson.data || []).map(t => ({ ...t, TeamNameAbb: t.TeamName || t.TeamNameAbb }));
+      const pitTeams = (pitJson.data || []).map(t => ({ ...t, TeamNameAbb: t.TeamName || t.TeamNameAbb }));
 
       // Merge by team abbreviation
       const pitMap = {};
@@ -876,30 +872,54 @@ async function generate() {
       currentData = hitTeams.map(ht => {
         const pt = pitMap[ht.TeamNameAbb] || {};
         const merged = { _isTeam: true, TeamNameAbb: ht.TeamNameAbb, TeamName: ht.TeamNameAbb, PlayerName: ht.TeamNameAbb };
-        // Prefix all hitting stats with hit_
         for (const k of Object.keys(ht)) {
-          if (k.startsWith('_') || ['TeamNameAbb','TeamName','PlayerName'].includes(k)) continue;
+          if (['TeamNameAbb','TeamName','PlayerName','Name','Team'].includes(k)) continue;
           merged['hit_' + k] = ht[k];
         }
-        // Prefix all pitching stats with pit_
         for (const k of Object.keys(pt)) {
-          if (k.startsWith('_') || ['TeamNameAbb','TeamName','PlayerName'].includes(k)) continue;
+          if (['TeamNameAbb','TeamName','PlayerName','Name','Team'].includes(k)) continue;
           merged['pit_' + k] = pt[k];
         }
-        // Combined stats
         merged.total_WAR = (ht.WAR || 0) + (pt.WAR || 0);
-        merged._hitterCount = ht._hitterCount || 0;
-        merged._pitcherCount = pt._pitcherCount || 0;
         return merged;
       }).filter(t => t.TeamNameAbb);
 
       currentGroupBy = 'team';
+    } else if (isTeam) {
+      // Use team=0,ts for FanGraphs' own team aggregation (accurate for traded players)
+      const teamParam = selTeam.value === '0' ? '0,ts' : selTeam.value;
+      const params = new URLSearchParams({
+        pos: isHitting ? selStats.value : 'all',
+        stats: isHitting ? 'bat' : selStats.value,
+        lg: selLg.value,
+        qual: '0',
+        type: '4',
+        season, season1: season,
+        month: '0', ind: '0',
+        hand: selHand.value,
+        team: teamParam,
+        pageitems: '10000', pagenum: '1',
+        sortstat: 'WAR', sortdir: 'default'
+      });
+      const resp = await fetch(`${PROXY}?${params}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if (json.error) throw new Error(json.error);
+      const teams = json.data;
+      if (!teams || !teams.length) throw new Error('No data returned');
+
+      currentGroupBy = 'team';
+      currentData = teams.map(t => ({
+        ...t, _isTeam: true,
+        TeamNameAbb: t.TeamName || t.TeamNameAbb,
+        PlayerName: t.TeamName || t.TeamNameAbb,
+      }));
     } else {
       const params = new URLSearchParams({
         pos: isHitting ? selStats.value : 'all',
         stats: isHitting ? 'bat' : selStats.value,
         lg: selLg.value,
-        qual: isTeam ? '0' : selQual.value,
+        qual: selQual.value,
         type: '4',
         season, season1: season,
         month: '0', ind: '0',
@@ -915,8 +935,8 @@ async function generate() {
       const players = json.data;
       if (!players || !players.length) throw new Error('No data returned');
 
-      currentGroupBy = selGroup.value;
-      currentData = currentGroupBy === 'team' ? aggregateByTeam(players) : players;
+      currentGroupBy = 'player';
+      currentData = players;
     }
     currentXKey = selX.value;
     currentYKey = selY.value;
