@@ -506,7 +506,7 @@ const STAT_GROUPS_HITTING = [
   { group: 'Summary', stats: [
     { key: 'Age', label: 'Age' }, { key: 'AVG', label: 'AVG' }, { key: 'OBP', label: 'OBP' },
     { key: 'SLG', label: 'SLG' }, { key: 'OPS', label: 'OPS' }, { key: 'ISO', label: 'ISO' },
-    { key: 'wOBA', label: 'wOBA' }, { key: 'wRC+', label: 'wRC+' },
+    { key: 'wOBA', label: 'wOBA' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'wRC+', label: 'wRC+' },
     { key: 'WAR', label: 'WAR' }, { key: 'RAR', label: 'RAR' },
     { key: 'Batting', label: 'Batting' }, { key: 'Offense', label: 'Offense' },
   ]},
@@ -1016,7 +1016,7 @@ const PCT_KEYS = new Set([
   'pfxFA%','pfxFT%','pfxFC%','pfxFS%','pfxFO%','pfxSI%','pfxSL%','pfxCU%',
   'pfxKC%','pfxEP%','pfxCH%','pfxSC%','pfxKN%','pfxUN%',
   // Batting-specific
-  'OBP','SLG','OPS','ISO','wOBA',
+  'OBP','SLG','OPS','ISO','wOBA','xwOBA',
   'Pull%','Cent%','Oppo%','Soft%','Med%','Hard%',
   'Barrel%','HardHit%','BB/K',
 ]);
