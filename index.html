@@ -228,6 +228,16 @@
       object-position: 50% 18%;
       display: block;
     }
+    .team-dot {
+      border-radius: 0;
+      overflow: visible;
+      background: none;
+    }
+    .team-dot img {
+      border-radius: 0;
+      object-fit: contain;
+      object-position: center;
+    }
     /* Tooltip */
     .tooltip {
       position: fixed;
@@ -360,6 +370,13 @@
           </select>
         </div>
         <div class="control-group">
+          <label>Group By</label>
+          <select id="sel-group">
+            <option value="player">Players</option>
+            <option value="team">Teams</option>
+          </select>
+        </div>
+        <div class="control-group">
           <label>X Axis</label>
           <select id="sel-x"></select>
         </div>
@@ -466,10 +483,69 @@ const STAT_GROUPS = [
 // Flat list for lookups
 const STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
 
+// FanGraphs abbr → ESPN abbr mapping
+const TEAM_LOGO_ABBR = {
+  'LAA':'laa','BAL':'bal','BOS':'bos','CLE':'cle','DET':'det',
+  'KCR':'kc','MIN':'min','NYY':'nyy','ATH':'oak','OAK':'oak','SEA':'sea',
+  'TBR':'tb','TEX':'tex','TOR':'tor','ARI':'ari','CHC':'chc',
+  'CHW':'chw','CIN':'cin','COL':'col','MIA':'mia','HOU':'hou',
+  'LAD':'lad','MIL':'mil','WSN':'wsh','NYM':'nym','PHI':'phi',
+  'PIT':'pit','STL':'stl','SDP':'sd','SFG':'sf',
+};
+
+function teamLogoUrl(fgAbbr) {
+  const espn = TEAM_LOGO_ABBR[fgAbbr] || fgAbbr.toLowerCase();
+  return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/${espn}.png&w=60`;
+}
+
+// Stat aggregation: rate stats are IP-weighted averages, counting stats are sums
+const COUNTING_STATS = new Set([
+  'W','L','G','GS','CG','ShO','SV','HLD','BS','IP','TBF','H','R','ER','HR',
+  'BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls',
+  'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
+  'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
+]);
+
+function aggregateByTeam(players) {
+  const teams = {};
+  for (const p of players) {
+    const abbr = p.TeamNameAbb || p.TeamName || '';
+    if (!abbr) continue;
+    if (!teams[abbr]) teams[abbr] = { players: [], totalIP: 0 };
+    teams[abbr].players.push(p);
+    teams[abbr].totalIP += (p.IP || 0);
+  }
+  // Remove multi-team entries like "2 Tms", "3 Tms"
+  for (const key of Object.keys(teams)) {
+    if (/\d+\s*Tms?/.test(key)) delete teams[key];
+  }
+  return Object.entries(teams).map(([abbr, t]) => {
+    const agg = { _isTeam: true, TeamNameAbb: abbr, TeamName: abbr, PlayerName: abbr };
+    // Get all numeric keys from first player
+    const keys = Object.keys(t.players[0]).filter(k => typeof t.players[0][k] === 'number');
+    for (const k of keys) {
+      if (COUNTING_STATS.has(k)) {
+        agg[k] = t.players.reduce((s, p) => s + (p[k] || 0), 0);
+      } else {
+        // IP-weighted average for rate stats
+        if (t.totalIP > 0) {
+          agg[k] = t.players.reduce((s, p) => s + (p[k] || 0) * (p.IP || 0), 0) / t.totalIP;
+        } else {
+          agg[k] = t.players.reduce((s, p) => s + (p[k] || 0), 0) / t.players.length;
+        }
+      }
+    }
+    agg.IP = t.totalIP;
+    agg._pitcherCount = t.players.length;
+    return agg;
+  });
+}
+
 // State
 let currentData = null;
 let currentXKey = null;
 let currentYKey = null;
+let currentGroupBy = 'player';
 
 // Elements
 const selSeason = document.getElementById('sel-season');
@@ -478,6 +554,7 @@ const selLg = document.getElementById('sel-lg');
 const selHand = document.getElementById('sel-hand');
 const selQual = document.getElementById('sel-qual');
 const selTeam = document.getElementById('sel-team');
+const selGroup = document.getElementById('sel-group');
 const selX = document.getElementById('sel-x');
 const selY = document.getElementById('sel-y');
 const btnGenerate = document.getElementById('btn-generate');
@@ -553,7 +630,8 @@ async function generate() {
     const players = json.data;
     if (!players || !players.length) throw new Error('No data returned');
 
-    currentData = players;
+    currentGroupBy = selGroup.value;
+    currentData = currentGroupBy === 'team' ? aggregateByTeam(players) : players;
     currentXKey = selX.value;
     currentYKey = selY.value;
     chartStatus.style.display = 'none';
@@ -575,10 +653,14 @@ function rerenderLayout() {
   const xKey = currentXKey;
   const yKey = currentYKey;
 
+  const isTeamMode = currentGroupBy === 'team';
+
   // Filter valid data
   const valid = currentData.filter(p => {
     const xv = p[xKey], yv = p[yKey];
-    return xv != null && yv != null && isFinite(xv) && isFinite(yv) && p.xMLBAMID && p.xMLBAMID !== 0;
+    if (xv == null || yv == null || !isFinite(xv) || !isFinite(yv)) return false;
+    if (isTeamMode) return true;
+    return p.xMLBAMID && p.xMLBAMID !== 0;
   });
 
   if (!valid.length) {
@@ -617,8 +699,10 @@ function rerenderLayout() {
   const plotH = Math.max(400, window.innerHeight - 300);
   plotArea.style.height = plotH + 'px';
 
-  // Dot size
-  const dotSize = Math.round(Math.min(32, Math.max(28, plotW / 40)));
+  // Dot size — larger for team logos
+  const dotSize = isTeamMode
+    ? Math.round(Math.min(44, Math.max(36, plotW / 28)))
+    : Math.round(Math.min(32, Math.max(28, plotW / 40)));
 
   // Nice tick generation
   function niceTicks(min, max, count) {
@@ -691,7 +775,7 @@ function rerenderLayout() {
   avgLabelY.textContent = `avg ${formatStat(yAvg, yKey)}`;
   plotArea.appendChild(avgLabelY);
 
-  // Player dots
+  // Dots (player headshots or team logos)
   const half = dotSize / 2;
   for (const p of valid) {
     const xPct = (displayVal(p[xKey], xKey) - xMin) / (xMax - xMin);
@@ -700,15 +784,20 @@ function rerenderLayout() {
     const top = yPct * plotH - half;
 
     const dot = document.createElement('div');
-    dot.className = 'player-dot';
+    dot.className = 'player-dot' + (isTeamMode ? ' team-dot' : '');
     dot.style.width = dotSize + 'px';
     dot.style.height = dotSize + 'px';
     dot.style.left = left + 'px';
     dot.style.top = top + 'px';
 
     const img = document.createElement('img');
-    img.src = headshotUrl(p.xMLBAMID);
-    img.alt = p.PlayerName;
+    if (isTeamMode) {
+      img.src = teamLogoUrl(p.TeamNameAbb);
+      img.alt = p.TeamNameAbb;
+    } else {
+      img.src = headshotUrl(p.xMLBAMID);
+      img.alt = p.PlayerName;
+    }
     img.loading = 'lazy';
     dot.appendChild(img);
 
@@ -748,7 +837,11 @@ function formatStat(v, key) {
 
 function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   ttName.textContent = player.PlayerName;
-  ttMeta.textContent = `${player.TeamName || player.TeamNameAbb || ''}  |  ${player.Throws || ''}  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+  if (player._isTeam) {
+    ttMeta.textContent = `${player._pitcherCount} pitchers  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+  } else {
+    ttMeta.textContent = `${player.TeamName || player.TeamNameAbb || ''}  |  ${player.Throws || ''}  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+  }
   ttStats.innerHTML = `
     <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[xKey], xKey), xKey)}</span></div>
     <div class="tooltip-stat"><span class="tooltip-stat-label">${yLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[yKey], yKey), yKey)}</span></div>
