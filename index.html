@@ -1012,23 +1012,26 @@ function rerenderLayout() {
 const PCT_KEYS = new Set([
   'K%','BB%','K-BB%','BABIP','LOB%','GB%','FB%','HR/FB','SwStr%','IFFB%','LD%',
   'O-Swing%','Z-Swing%','Swing%','O-Contact%','Z-Contact%','Contact%','Zone%','F-Strike%',
-  'CStr%','CSW%','IFH%','BUH%','TTO%','AVG',
+  'CStr%','CSW%','IFH%','BUH%','TTO%',
   'pfxFA%','pfxFT%','pfxFC%','pfxFS%','pfxFO%','pfxSI%','pfxSL%','pfxCU%',
   'pfxKC%','pfxEP%','pfxCH%','pfxSC%','pfxKN%','pfxUN%',
-  // Batting-specific
-  'OBP','SLG','OPS','ISO','wOBA','xwOBA',
+  // Batting-specific percentages
   'Pull%','Cent%','Oppo%','Soft%','Med%','Hard%',
-  'Barrel%','HardHit%','BB/K',
+  'Barrel%','HardHit%',
 ]);
 
 function displayVal(val, key) {
   return PCT_KEYS.has(key) ? val * 100 : val;
 }
 
+// Stats displayed as .xxx (batting average format)
+const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','BABIP']);
+
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
+  if (SLASH_KEYS.has(key)) return v.toFixed(3);
   if (PCT_KEYS.has(key)) return v.toFixed(1) + '%';
-  if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd'].includes(key)) return v.toFixed(2);
+  if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(key)) return v.toFixed(2);
   if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC'].includes(key)) return v.toFixed(1);
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(key)) return Math.round(v);
   if (key.startsWith('pfxv')) return v.toFixed(1);
