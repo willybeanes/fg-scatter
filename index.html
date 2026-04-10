@@ -365,7 +365,6 @@ const STAT_OPTIONS = [
   { key: 'FB%',    label: 'FB%' },
   { key: 'HR/FB',  label: 'HR/FB' },
   { key: 'SwStr%', label: 'SwStr%' },
-  { key: 'CSW%',   label: 'CSW%' },
   { key: 'ERA-',   label: 'ERA-' },
   { key: 'FIP-',   label: 'FIP-' },
   { key: 'xFIP-',  label: 'xFIP-' },
@@ -493,11 +492,11 @@ function rerenderLayout() {
   axisLabelX.textContent = xLabel;
   axisLabelY.textContent = yLabel;
 
-  // Compute ranges with 5% padding
+  // Compute ranges with 5% padding (convert pct keys to display values)
   let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
   let xSum = 0, ySum = 0;
   for (const p of valid) {
-    const xv = p[xKey], yv = p[yKey];
+    const xv = displayVal(p[xKey], xKey), yv = displayVal(p[yKey], yKey);
     if (xv < xMin) xMin = xv;
     if (xv > xMax) xMax = xv;
     if (yv < yMin) yMin = yv;
@@ -594,8 +593,8 @@ function rerenderLayout() {
   // Player dots
   const half = dotSize / 2;
   for (const p of valid) {
-    const xPct = (p[xKey] - xMin) / (xMax - xMin);
-    const yPct = 1 - (p[yKey] - yMin) / (yMax - yMin);
+    const xPct = (displayVal(p[xKey], xKey) - xMin) / (xMax - xMin);
+    const yPct = 1 - (displayVal(p[yKey], yKey) - yMin) / (yMax - yMin);
     const left = xPct * plotW - half;
     const top = yPct * plotH - half;
 
@@ -621,20 +620,28 @@ function rerenderLayout() {
   }
 }
 
-function formatStat(val, key) {
-  if (key.includes('%')) return (val * 1).toFixed(1) + '%';
-  if (['ERA','FIP','xFIP','SIERA','WHIP','BABIP','HR/9','BB/9','K/9','HR/FB'].includes(key)) return val.toFixed(2);
-  if (['WAR','IP'].includes(key)) return val.toFixed(1);
-  if (['ERA-','FIP-','xFIP-'].includes(key)) return Math.round(val);
-  return Number.isInteger(val) ? val : val.toFixed(2);
+// Percentage keys come back as decimals (0.32 = 32%) — convert for display
+const PCT_KEYS = new Set(['K%','BB%','K-BB%','BABIP','LOB%','GB%','FB%','HR/FB','SwStr%','IFFB%','LD%']);
+
+function displayVal(val, key) {
+  return PCT_KEYS.has(key) ? val * 100 : val;
+}
+
+// formatStat expects already-converted display values (pct already *100)
+function formatStat(v, key) {
+  if (PCT_KEYS.has(key)) return v.toFixed(1) + '%';
+  if (['ERA','FIP','xFIP','SIERA','WHIP','HR/9','BB/9','K/9'].includes(key)) return v.toFixed(2);
+  if (['WAR','IP'].includes(key)) return v.toFixed(1);
+  if (['ERA-','FIP-','xFIP-'].includes(key)) return Math.round(v);
+  return Number.isInteger(v) ? v : v.toFixed(2);
 }
 
 function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   ttName.textContent = player.PlayerName;
-  ttMeta.textContent = `${player.team_name || ''}  |  ${player.Throws || ''}  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+  ttMeta.textContent = `${player.TeamName || player.TeamNameAbb || ''}  |  ${player.Throws || ''}  |  ${formatStat(player.IP || 0, 'IP')} IP`;
   ttStats.innerHTML = `
-    <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(player[xKey], xKey)}</span></div>
-    <div class="tooltip-stat"><span class="tooltip-stat-label">${yLabel}</span><span class="tooltip-stat-value">${formatStat(player[yKey], yKey)}</span></div>
+    <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[xKey], xKey), xKey)}</span></div>
+    <div class="tooltip-stat"><span class="tooltip-stat-label">${yLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[yKey], yKey), yKey)}</span></div>
   `;
   tooltip.style.display = 'block';
   moveTooltip(e);
