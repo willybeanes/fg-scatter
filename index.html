@@ -304,6 +304,7 @@
     <div class="tab-bar">
       <button class="tab active" data-mode="pitching">Pitcher Scatter Plot</button>
       <button class="tab" data-mode="hitting">Hitter Scatter Plot</button>
+      <button class="tab" data-mode="combined">Combined Scatter Plot</button>
     </div>
     <div class="controls-card">
       <div class="controls-row">
@@ -558,6 +559,33 @@ const STAT_GROUPS_HITTING = [
   ]},
 ];
 
+const STAT_GROUPS_COMBINED = [
+  { group: 'Hitting', stats: [
+    { key: 'hit_WAR', label: 'WAR (Hit)' }, { key: 'hit_wRC+', label: 'wRC+' },
+    { key: 'hit_OPS', label: 'OPS' }, { key: 'hit_wOBA', label: 'wOBA' }, { key: 'hit_xwOBA', label: 'xwOBA' },
+    { key: 'hit_AVG', label: 'AVG' }, { key: 'hit_OBP', label: 'OBP' }, { key: 'hit_SLG', label: 'SLG' },
+    { key: 'hit_xSLG', label: 'xSLG' }, { key: 'hit_ISO', label: 'ISO' },
+    { key: 'hit_HR', label: 'HR' }, { key: 'hit_R', label: 'Runs' }, { key: 'hit_RBI', label: 'RBI' },
+    { key: 'hit_SB', label: 'SB' }, { key: 'hit_BB%', label: 'BB% (Hit)' }, { key: 'hit_K%', label: 'K% (Hit)' },
+    { key: 'hit_BABIP', label: 'BABIP (Hit)' }, { key: 'hit_BaseRunning', label: 'BsR' },
+  ]},
+  { group: 'Pitching', stats: [
+    { key: 'pit_WAR', label: 'WAR (Pit)' }, { key: 'pit_ERA', label: 'ERA' },
+    { key: 'pit_FIP', label: 'FIP' }, { key: 'pit_xFIP', label: 'xFIP' },
+    { key: 'pit_SIERA', label: 'SIERA' }, { key: 'pit_xERA', label: 'xERA' },
+    { key: 'pit_WHIP', label: 'WHIP' }, { key: 'pit_K%', label: 'K% (Pit)' },
+    { key: 'pit_BB%', label: 'BB% (Pit)' }, { key: 'pit_K-BB%', label: 'K-BB%' },
+    { key: 'pit_SwStr%', label: 'SwStr%' }, { key: 'pit_ERA-', label: 'ERA-' },
+    { key: 'pit_FIP-', label: 'FIP-' }, { key: 'pit_BABIP', label: 'BABIP (Pit)' },
+    { key: 'pit_HR/9', label: 'HR/9' }, { key: 'pit_K/9', label: 'K/9' },
+    { key: 'pit_sp_stuff', label: 'Stuff+' }, { key: 'pit_sp_location', label: 'Location+' },
+    { key: 'pit_sp_pitching', label: 'Pitching+' },
+  ]},
+  { group: 'Combined', stats: [
+    { key: 'total_WAR', label: 'Total WAR' },
+  ]},
+];
+
 // Active stat groups (swapped when mode changes)
 let STAT_GROUPS = STAT_GROUPS_PITCHING;
 let STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
@@ -692,35 +720,45 @@ function switchMode(mode) {
   document.querySelectorAll('.tab').forEach(t => {
     t.classList.toggle('active', t.dataset.mode === mode);
   });
+  const isCombined = mode === 'combined';
   // Swap stat groups
-  STAT_GROUPS = mode === 'hitting' ? STAT_GROUPS_HITTING : STAT_GROUPS_PITCHING;
+  STAT_GROUPS = mode === 'hitting' ? STAT_GROUPS_HITTING : mode === 'combined' ? STAT_GROUPS_COMBINED : STAT_GROUPS_PITCHING;
   STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
   // Repopulate axis dropdowns
   populateAxisDropdowns();
-  selX.value = mode === 'hitting' ? 'wRC+' : 'SwStr%';
-  selY.value = mode === 'hitting' ? 'WAR' : 'ERA';
-  // Swap type/position dropdown
-  const label = selStats.closest('.control-group').querySelector('label');
-  selStats.innerHTML = '';
-  if (mode === 'hitting') {
-    label.textContent = 'Position';
-    HITTING_POS_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
-  } else {
-    label.textContent = 'Pitcher Type';
-    PITCHING_TYPE_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
-  }
-  // Swap Min IP / Min PA label and options
-  const qualLabel = selQual.closest('.control-group').querySelector('label');
-  selQual.innerHTML = '';
-  if (mode === 'hitting') {
-    qualLabel.textContent = 'Min PA';
-    selQual.appendChild(new Option('Qualified', 'y'));
-    for (let i = 0; i <= 600; i += 10) selQual.appendChild(new Option(String(i), String(i)));
-  } else {
-    qualLabel.textContent = 'Min IP';
-    ['y','0','1','5','10','20','30','40','50','60','80','100','120','140','160'].forEach(v =>
-      selQual.appendChild(new Option(v === 'y' ? 'Qualified' : v, v))
-    );
+  if (mode === 'combined') { selX.value = 'hit_wRC+'; selY.value = 'pit_ERA'; }
+  else if (mode === 'hitting') { selX.value = 'wRC+'; selY.value = 'WAR'; }
+  else { selX.value = 'SwStr%'; selY.value = 'ERA'; }
+  // Hide/show controls based on mode
+  const hiddenInCombined = [selStats, selHand, selQual, selTeam, selGroup].map(el => el.closest('.control-group'));
+  hiddenInCombined.forEach(cg => cg.style.display = isCombined ? 'none' : '');
+  if (!isCombined) {
+    // Swap type/position dropdown
+    const label = selStats.closest('.control-group').querySelector('label');
+    selStats.innerHTML = '';
+    if (mode === 'hitting') {
+      label.textContent = 'Position';
+      HITTING_POS_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
+    } else {
+      label.textContent = 'Pitcher Type';
+      PITCHING_TYPE_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
+    }
+    // Swap Min IP / Min PA label and options
+    const qualLabel = selQual.closest('.control-group').querySelector('label');
+    selQual.innerHTML = '';
+    if (mode === 'hitting') {
+      qualLabel.textContent = 'Min PA';
+      selQual.appendChild(new Option('Qualified', 'y'));
+      for (let i = 0; i <= 600; i += 10) selQual.appendChild(new Option(String(i), String(i)));
+    } else {
+      qualLabel.textContent = 'Min IP';
+      ['y','0','1','5','10','20','30','40','50','60','80','100','120','140','160'].forEach(v =>
+        selQual.appendChild(new Option(v === 'y' ? 'Qualified' : v, v))
+      );
+    }
+    // Re-enable qual if it was disabled
+    selQual.disabled = false;
+    selQual.style.opacity = '1';
   }
   // Clear chart
   currentData = null;
@@ -764,6 +802,7 @@ function switchMode(mode) {
   // Load state from URL params and auto-generate
   const urlP = new URLSearchParams(window.location.search);
   if (urlP.get('mode') === 'hitting') switchMode('hitting');
+  if (urlP.get('mode') === 'combined') switchMode('combined');
   if (urlP.has('season')) selSeason.value = urlP.get('season');
   if (urlP.has('stats')) selStats.value = urlP.get('stats');
   if (urlP.has('lg')) selLg.value = urlP.get('lg');
@@ -785,32 +824,22 @@ function headshotUrl(mlbamId) {
 
 async function generate() {
   const season = selSeason.value;
-  const isTeam = selGroup.value === 'team';
+  const isCombined = currentMode === 'combined';
+  const isTeam = isCombined || selGroup.value === 'team';
   const isHitting = currentMode === 'hitting';
-  const params = new URLSearchParams({
-    pos: isHitting ? selStats.value : 'all',
-    stats: isHitting ? 'bat' : selStats.value,
-    lg: selLg.value,
-    qual: isTeam ? '0' : selQual.value,
-    type: '4',
-    season: season,
-    season1: season,
-    month: '0',
-    ind: '0',
-    hand: selHand.value,
-    team: selTeam.value,
-    pageitems: '10000',
-    pagenum: '1',
-    sortstat: 'WAR',
-    sortdir: 'default'
-  });
 
   // Update URL with current state
-  const urlState = new URLSearchParams({
-    mode: currentMode, season, stats: selStats.value, lg: selLg.value, hand: selHand.value,
-    qual: selQual.value, team: selTeam.value, group: selGroup.value,
-    x: selX.value, y: selY.value
-  });
+  const urlState = new URLSearchParams({ mode: currentMode, season });
+  if (!isCombined) {
+    urlState.set('stats', selStats.value);
+    urlState.set('lg', selLg.value);
+    urlState.set('hand', selHand.value);
+    urlState.set('qual', selQual.value);
+    urlState.set('team', selTeam.value);
+    urlState.set('group', selGroup.value);
+  }
+  urlState.set('x', selX.value);
+  urlState.set('y', selY.value);
   history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
@@ -822,15 +851,73 @@ async function generate() {
   btnReset.style.display = 'none';
 
   try {
-    const resp = await fetch(`${PROXY}?${params}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (json.error) throw new Error(json.error);
-    const players = json.data;
-    if (!players || !players.length) throw new Error('No data returned');
+    if (isCombined) {
+      // Fetch both batting and pitching data in parallel
+      const baseParams = { pos: 'all', lg: 'all', qual: '0', type: '4', season, season1: season, month: '0', ind: '0', hand: '', team: '0', pageitems: '10000', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
+      const [batResp, pitResp] = await Promise.all([
+        fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'bat' })}`),
+        fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'pit' })}`)
+      ]);
+      if (!batResp.ok || !pitResp.ok) throw new Error('HTTP error fetching data');
+      const [batJson, pitJson] = await Promise.all([batResp.json(), pitResp.json()]);
+      if (batJson.error) throw new Error(batJson.error);
+      if (pitJson.error) throw new Error(pitJson.error);
 
-    currentGroupBy = selGroup.value;
-    currentData = currentGroupBy === 'team' ? aggregateByTeam(players) : players;
+      // Aggregate each by team
+      currentMode = 'hitting';
+      const hitTeams = aggregateByTeam(batJson.data || []);
+      currentMode = 'pitching';
+      const pitTeams = aggregateByTeam(pitJson.data || []);
+      currentMode = 'combined';
+
+      // Merge by team abbreviation
+      const pitMap = {};
+      for (const t of pitTeams) pitMap[t.TeamNameAbb] = t;
+      currentData = hitTeams.map(ht => {
+        const pt = pitMap[ht.TeamNameAbb] || {};
+        const merged = { _isTeam: true, TeamNameAbb: ht.TeamNameAbb, TeamName: ht.TeamNameAbb, PlayerName: ht.TeamNameAbb };
+        // Prefix all hitting stats with hit_
+        for (const k of Object.keys(ht)) {
+          if (k.startsWith('_') || ['TeamNameAbb','TeamName','PlayerName'].includes(k)) continue;
+          merged['hit_' + k] = ht[k];
+        }
+        // Prefix all pitching stats with pit_
+        for (const k of Object.keys(pt)) {
+          if (k.startsWith('_') || ['TeamNameAbb','TeamName','PlayerName'].includes(k)) continue;
+          merged['pit_' + k] = pt[k];
+        }
+        // Combined stats
+        merged.total_WAR = (ht.WAR || 0) + (pt.WAR || 0);
+        merged._hitterCount = ht._hitterCount || 0;
+        merged._pitcherCount = pt._pitcherCount || 0;
+        return merged;
+      }).filter(t => t.TeamNameAbb);
+
+      currentGroupBy = 'team';
+    } else {
+      const params = new URLSearchParams({
+        pos: isHitting ? selStats.value : 'all',
+        stats: isHitting ? 'bat' : selStats.value,
+        lg: selLg.value,
+        qual: isTeam ? '0' : selQual.value,
+        type: '4',
+        season, season1: season,
+        month: '0', ind: '0',
+        hand: selHand.value,
+        team: selTeam.value,
+        pageitems: '10000', pagenum: '1',
+        sortstat: 'WAR', sortdir: 'default'
+      });
+      const resp = await fetch(`${PROXY}?${params}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if (json.error) throw new Error(json.error);
+      const players = json.data;
+      if (!players || !players.length) throw new Error('No data returned');
+
+      currentGroupBy = selGroup.value;
+      currentData = currentGroupBy === 'team' ? aggregateByTeam(players) : players;
+    }
     currentXKey = selX.value;
     currentYKey = selY.value;
     chartStatus.style.display = 'none';
@@ -1033,8 +1120,13 @@ const PCT_KEYS = new Set([
   'Barrel%','HardHit%',
 ]);
 
+// Strip hit_/pit_ prefix for format lookups
+function baseKey(key) {
+  return key.replace(/^(hit_|pit_)/, '');
+}
+
 function displayVal(val, key) {
-  return PCT_KEYS.has(key) ? val * 100 : val;
+  return PCT_KEYS.has(baseKey(key)) ? val * 100 : val;
 }
 
 // Stats displayed as .xxx (batting average format)
@@ -1042,14 +1134,16 @@ const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG',
 
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
-  if (SLASH_KEYS.has(key)) return v.toFixed(3);
-  if (PCT_KEYS.has(key)) return v.toFixed(1) + '%';
-  if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(key)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC'].includes(key)) return v.toFixed(1);
-  if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(key)) return Math.round(v);
-  if (key.startsWith('pfxv')) return v.toFixed(1);
-  if (['Age'].includes(key)) return v.toFixed(0);
-  if (['W','L','G','GS','CG','ShO','SV','HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS'].includes(key)) return Math.round(v);
+  const bk = baseKey(key);
+  if (SLASH_KEYS.has(bk)) return v.toFixed(3);
+  if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
+  if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC'].includes(bk)) return v.toFixed(1);
+  if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
+  if (bk.startsWith('pfxv')) return v.toFixed(1);
+  if (['Age'].includes(bk)) return v.toFixed(0);
+  if (['W','L','G','GS','CG','ShO','SV','HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS'].includes(bk)) return Math.round(v);
+  if (key === 'total_WAR') return v.toFixed(1);
   return Number.isInteger(v) ? v : v.toFixed(2);
 }
 
@@ -1057,10 +1151,14 @@ function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   ttName.textContent = player.PlayerName;
   const isHit = currentMode === 'hitting';
   if (player._isTeam) {
-    const count = player._pitcherCount || player._hitterCount || 0;
-    const label = isHit ? 'hitters' : 'pitchers';
-    const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
-    ttMeta.textContent = `${count} ${label}  |  ${vol}`;
+    if (currentMode === 'combined') {
+      ttMeta.textContent = `${player._hitterCount || 0} hitters  |  ${player._pitcherCount || 0} pitchers`;
+    } else {
+      const count = player._pitcherCount || player._hitterCount || 0;
+      const label = isHit ? 'hitters' : 'pitchers';
+      const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
+      ttMeta.textContent = `${count} ${label}  |  ${vol}`;
+    }
   } else {
     const hand = isHit ? (player.Bats || '') : (player.Throws || '');
     const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
