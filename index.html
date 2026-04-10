@@ -346,132 +346,80 @@
 <script>
 const PROXY = 'https://fg-proxy.vercel.app/api/fangraphs';
 
-const STAT_OPTIONS = [
-  // -- Summary --
-  { key: 'Age',     label: 'Age' },
-  { key: 'ERA',     label: 'ERA' },
-  { key: 'FIP',     label: 'FIP' },
-  { key: 'xFIP',    label: 'xFIP' },
-  { key: 'SIERA',   label: 'SIERA' },
-  { key: 'xERA',    label: 'xERA' },
-  { key: 'ERA-',    label: 'ERA-' },
-  { key: 'FIP-',    label: 'FIP-' },
-  { key: 'xFIP-',   label: 'xFIP-' },
-  { key: 'WAR',     label: 'WAR' },
-  { key: 'RAR',     label: 'RAR' },
-  // -- Counting --
-  { key: 'W',       label: 'W' },
-  { key: 'L',       label: 'L' },
-  { key: 'G',       label: 'G' },
-  { key: 'GS',      label: 'GS' },
-  { key: 'CG',      label: 'CG' },
-  { key: 'ShO',     label: 'ShO' },
-  { key: 'SV',      label: 'SV' },
-  { key: 'HLD',     label: 'HLD' },
-  { key: 'BS',      label: 'BS' },
-  { key: 'IP',      label: 'IP' },
-  { key: 'TBF',     label: 'TBF' },
-  { key: 'H',       label: 'H' },
-  { key: 'R',       label: 'R' },
-  { key: 'ER',      label: 'ER' },
-  { key: 'HR',      label: 'HR' },
-  { key: 'BB',      label: 'BB' },
-  { key: 'IBB',     label: 'IBB' },
-  { key: 'HBP',     label: 'HBP' },
-  { key: 'WP',      label: 'WP' },
-  { key: 'BK',      label: 'BK' },
-  { key: 'SO',      label: 'SO' },
-  { key: 'GB',      label: 'GB' },
-  { key: 'FB',      label: 'FB' },
-  { key: 'LD',      label: 'LD' },
-  { key: 'IFFB',    label: 'IFFB' },
-  { key: 'Pitches', label: 'Pitches' },
-  { key: 'Balls',   label: 'Balls' },
-  { key: 'Strikes', label: 'Strikes' },
-  { key: 'RS',      label: 'RS' },
-  { key: 'IFH',     label: 'IFH' },
-  { key: 'BU',      label: 'BU' },
-  { key: 'BUH',     label: 'BUH' },
-  { key: 'SD',      label: 'SD' },
-  { key: 'MD',      label: 'MD' },
-  // -- Rate --
-  { key: 'K/9',     label: 'K/9' },
-  { key: 'BB/9',    label: 'BB/9' },
-  { key: 'K/BB',    label: 'K/BB' },
-  { key: 'H/9',     label: 'H/9' },
-  { key: 'HR/9',    label: 'HR/9' },
-  { key: 'K%',      label: 'K%' },
-  { key: 'BB%',     label: 'BB%' },
-  { key: 'K-BB%',   label: 'K-BB%' },
-  { key: 'AVG',     label: 'AVG' },
-  { key: 'WHIP',    label: 'WHIP' },
-  { key: 'BABIP',   label: 'BABIP' },
-  { key: 'LOB%',    label: 'LOB%' },
-  { key: 'HR/FB',   label: 'HR/FB' },
-  { key: 'TTO%',    label: 'TTO%' },
-  // -- Batted Ball --
-  { key: 'GB/FB',   label: 'GB/FB' },
-  { key: 'GB%',     label: 'GB%' },
-  { key: 'FB%',     label: 'FB%' },
-  { key: 'LD%',     label: 'LD%' },
-  { key: 'IFFB%',   label: 'IFFB%' },
-  { key: 'IFH%',    label: 'IFH%' },
-  { key: 'BUH%',    label: 'BUH%' },
-  // -- Win Probability --
-  { key: 'WPA',     label: 'WPA' },
-  { key: '-WPA',    label: '-WPA' },
-  { key: '+WPA',    label: '+WPA' },
-  // -- Plate Discipline --
-  { key: 'O-Swing%',  label: 'O-Swing%' },
-  { key: 'Z-Swing%',  label: 'Z-Swing%' },
-  { key: 'Swing%',    label: 'Swing%' },
-  { key: 'O-Contact%',label: 'O-Contact%' },
-  { key: 'Z-Contact%',label: 'Z-Contact%' },
-  { key: 'Contact%',  label: 'Contact%' },
-  { key: 'Zone%',     label: 'Zone%' },
-  { key: 'F-Strike%', label: 'F-Strike%' },
-  { key: 'SwStr%',    label: 'SwStr%' },
-  { key: 'CStr%',     label: 'CStr%' },
-  { key: 'CSW%',      label: 'CSW%' },
-  // -- Workload --
-  { key: 'Starting',   label: 'Starting' },
-  { key: 'Start-IP',   label: 'Start-IP' },
-  { key: 'Relieving',  label: 'Relieving' },
-  { key: 'Relief-IP',  label: 'Relief-IP' },
-  // -- Pitch Usage (%) --
-  { key: 'pfxFA%',  label: 'FA%' },
-  { key: 'pfxFT%',  label: 'FT%' },
-  { key: 'pfxFC%',  label: 'FC%' },
-  { key: 'pfxFS%',  label: 'FS%' },
-  { key: 'pfxFO%',  label: 'FO%' },
-  { key: 'pfxSI%',  label: 'SI%' },
-  { key: 'pfxSL%',  label: 'SL%' },
-  { key: 'pfxCU%',  label: 'CU%' },
-  { key: 'pfxKC%',  label: 'KC%' },
-  { key: 'pfxEP%',  label: 'EP%' },
-  { key: 'pfxCH%',  label: 'CH%' },
-  { key: 'pfxSC%',  label: 'SC%' },
-  { key: 'pfxKN%',  label: 'KN%' },
-  { key: 'pfxUN%',  label: 'UN%' },
-  // -- Pitch Velocity --
-  { key: 'pfxvFA',  label: 'vFA' },
-  { key: 'pfxvFT',  label: 'vFT' },
-  { key: 'pfxvFC',  label: 'vFC' },
-  { key: 'pfxvFS',  label: 'vFS' },
-  { key: 'pfxvFO',  label: 'vFO' },
-  { key: 'pfxvSI',  label: 'vSI' },
-  { key: 'pfxvSL',  label: 'vSL' },
-  { key: 'pfxvCU',  label: 'vCU' },
-  { key: 'pfxvKC',  label: 'vKC' },
-  { key: 'pfxvEP',  label: 'vEP' },
-  { key: 'pfxvCH',  label: 'vCH' },
-  { key: 'pfxvSC',  label: 'vSC' },
-  { key: 'pfxvKN',  label: 'vKN' },
-  // -- Stuff+ / PitchingBot --
-  { key: 'sp_stuff',    label: 'Stuff+' },
-  { key: 'sp_location', label: 'Location+' },
-  { key: 'sp_pitching', label: 'Pitching+' },
+const STAT_GROUPS = [
+  { group: 'Summary', stats: [
+    { key: 'Age', label: 'Age' }, { key: 'ERA', label: 'ERA' }, { key: 'FIP', label: 'FIP' },
+    { key: 'xFIP', label: 'xFIP' }, { key: 'SIERA', label: 'SIERA' }, { key: 'xERA', label: 'xERA' },
+    { key: 'ERA-', label: 'ERA-' }, { key: 'FIP-', label: 'FIP-' }, { key: 'xFIP-', label: 'xFIP-' },
+    { key: 'WAR', label: 'WAR' }, { key: 'RAR', label: 'RAR' },
+  ]},
+  { group: 'Counting', stats: [
+    { key: 'W', label: 'W' }, { key: 'L', label: 'L' }, { key: 'G', label: 'G' },
+    { key: 'GS', label: 'GS' }, { key: 'CG', label: 'CG' }, { key: 'ShO', label: 'ShO' },
+    { key: 'SV', label: 'SV' }, { key: 'HLD', label: 'HLD' }, { key: 'BS', label: 'BS' },
+    { key: 'IP', label: 'IP' }, { key: 'TBF', label: 'TBF' }, { key: 'H', label: 'H' },
+    { key: 'R', label: 'R' }, { key: 'ER', label: 'ER' }, { key: 'HR', label: 'HR' },
+    { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' }, { key: 'HBP', label: 'HBP' },
+    { key: 'WP', label: 'WP' }, { key: 'BK', label: 'BK' }, { key: 'SO', label: 'SO' },
+    { key: 'GB', label: 'GB' }, { key: 'FB', label: 'FB' }, { key: 'LD', label: 'LD' },
+    { key: 'IFFB', label: 'IFFB' }, { key: 'Pitches', label: 'Pitches' },
+    { key: 'Balls', label: 'Balls' }, { key: 'Strikes', label: 'Strikes' },
+    { key: 'RS', label: 'RS' }, { key: 'IFH', label: 'IFH' }, { key: 'BU', label: 'BU' },
+    { key: 'BUH', label: 'BUH' }, { key: 'SD', label: 'SD' }, { key: 'MD', label: 'MD' },
+  ]},
+  { group: 'Rate', stats: [
+    { key: 'K/9', label: 'K/9' }, { key: 'BB/9', label: 'BB/9' }, { key: 'K/BB', label: 'K/BB' },
+    { key: 'H/9', label: 'H/9' }, { key: 'HR/9', label: 'HR/9' }, { key: 'K%', label: 'K%' },
+    { key: 'BB%', label: 'BB%' }, { key: 'K-BB%', label: 'K-BB%' }, { key: 'AVG', label: 'AVG' },
+    { key: 'WHIP', label: 'WHIP' }, { key: 'BABIP', label: 'BABIP' }, { key: 'LOB%', label: 'LOB%' },
+    { key: 'HR/FB', label: 'HR/FB' }, { key: 'TTO%', label: 'TTO%' },
+  ]},
+  { group: 'Batted Ball', stats: [
+    { key: 'GB/FB', label: 'GB/FB' }, { key: 'GB%', label: 'GB%' }, { key: 'FB%', label: 'FB%' },
+    { key: 'LD%', label: 'LD%' }, { key: 'IFFB%', label: 'IFFB%' },
+    { key: 'IFH%', label: 'IFH%' }, { key: 'BUH%', label: 'BUH%' },
+  ]},
+  { group: 'Win Probability', stats: [
+    { key: 'WPA', label: 'WPA' }, { key: '-WPA', label: '-WPA' }, { key: '+WPA', label: '+WPA' },
+  ]},
+  { group: 'Plate Discipline', stats: [
+    { key: 'O-Swing%', label: 'O-Swing%' }, { key: 'Z-Swing%', label: 'Z-Swing%' },
+    { key: 'Swing%', label: 'Swing%' }, { key: 'O-Contact%', label: 'O-Contact%' },
+    { key: 'Z-Contact%', label: 'Z-Contact%' }, { key: 'Contact%', label: 'Contact%' },
+    { key: 'Zone%', label: 'Zone%' }, { key: 'F-Strike%', label: 'F-Strike%' },
+    { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
+    { key: 'CSW%', label: 'CSW%' },
+  ]},
+  { group: 'Workload', stats: [
+    { key: 'Starting', label: 'Starting' }, { key: 'Start-IP', label: 'Start-IP' },
+    { key: 'Relieving', label: 'Relieving' }, { key: 'Relief-IP', label: 'Relief-IP' },
+  ]},
+  { group: 'Pitch Usage', stats: [
+    { key: 'pfxFA%', label: 'FA%' }, { key: 'pfxFT%', label: 'FT%' },
+    { key: 'pfxFC%', label: 'FC%' }, { key: 'pfxFS%', label: 'FS%' },
+    { key: 'pfxFO%', label: 'FO%' }, { key: 'pfxSI%', label: 'SI%' },
+    { key: 'pfxSL%', label: 'SL%' }, { key: 'pfxCU%', label: 'CU%' },
+    { key: 'pfxKC%', label: 'KC%' }, { key: 'pfxEP%', label: 'EP%' },
+    { key: 'pfxCH%', label: 'CH%' }, { key: 'pfxSC%', label: 'SC%' },
+    { key: 'pfxKN%', label: 'KN%' }, { key: 'pfxUN%', label: 'UN%' },
+  ]},
+  { group: 'Pitch Velocity', stats: [
+    { key: 'pfxvFA', label: 'vFA' }, { key: 'pfxvFT', label: 'vFT' },
+    { key: 'pfxvFC', label: 'vFC' }, { key: 'pfxvFS', label: 'vFS' },
+    { key: 'pfxvFO', label: 'vFO' }, { key: 'pfxvSI', label: 'vSI' },
+    { key: 'pfxvSL', label: 'vSL' }, { key: 'pfxvCU', label: 'vCU' },
+    { key: 'pfxvKC', label: 'vKC' }, { key: 'pfxvEP', label: 'vEP' },
+    { key: 'pfxvCH', label: 'vCH' }, { key: 'pfxvSC', label: 'vSC' },
+    { key: 'pfxvKN', label: 'vKN' },
+  ]},
+  { group: 'Stuff+ / PitchingBot', stats: [
+    { key: 'sp_stuff', label: 'Stuff+' }, { key: 'sp_location', label: 'Location+' },
+    { key: 'sp_pitching', label: 'Pitching+' },
+  ]},
 ];
+
+// Flat list for lookups
+const STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
 
 // State
 let currentData = null;
@@ -500,10 +448,14 @@ const axisLabelY = document.getElementById('axis-label-y');
 // Init
 (function init() {
   selSeason.value = new Date().getFullYear();
-  STAT_OPTIONS.forEach(s => {
-    selX.appendChild(new Option(s.label, s.key));
-    selY.appendChild(new Option(s.label, s.key));
-  });
+  for (const sel of [selX, selY]) {
+    STAT_GROUPS.forEach(g => {
+      const og = document.createElement('optgroup');
+      og.label = g.group;
+      g.stats.forEach(s => og.appendChild(new Option(s.label, s.key)));
+      sel.appendChild(og);
+    });
+  }
   selX.value = 'SwStr%';
   selY.value = 'ERA';
   btnGenerate.addEventListener('click', generate);
