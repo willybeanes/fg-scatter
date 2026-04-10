@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FanGraphs Pitcher Scatter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0ede8;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      letter-spacing: -0.3px;
+    }
+    .controls-card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .control-group label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+    }
+    .control-group select,
+    .control-group input[type="number"] {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 7px 12px;
+      border: 1px solid #d8d5d0;
+      border-radius: 8px;
+      background: #fff;
+      color: #1a1a1a;
+      outline: none;
+      min-width: 130px;
+    }
+    .control-group input[type="number"] { width: 90px; min-width: 90px; }
+    .control-group select:focus,
+    .control-group input:focus {
+      border-color: #999;
+    }
+    #btn-generate {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 22px;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #btn-generate:hover { background: #333; }
+    #btn-generate:disabled { background: #999; cursor: not-allowed; }
+    .chart-card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      padding: 24px;
+      position: relative;
+      min-height: 500px;
+    }
+    .chart-status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #888;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .chart-status.error { color: #c44820; }
+    .chart-area {
+      position: relative;
+      width: 100%;
+    }
+    /* Axis labels */
+    .axis-label {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 500;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .axis-label-x {
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .axis-label-y {
+      top: 50%;
+      left: -8px;
+      transform: rotate(-90deg) translateX(-50%);
+      transform-origin: left center;
+    }
+    /* Plot area */
+    .plot-area {
+      position: relative;
+      border-left: 1.5px solid #d8d5d0;
+      border-bottom: 1.5px solid #d8d5d0;
+      margin-left: 50px;
+      margin-bottom: 40px;
+      margin-top: 10px;
+      margin-right: 20px;
+      overflow: visible;
+    }
+    .grid-line {
+      position: absolute;
+      background: #f0ede8;
+    }
+    .grid-line-h {
+      left: 0; right: 0;
+      height: 0.5px;
+    }
+    .grid-line-v {
+      top: 0; bottom: 0;
+      width: 0.5px;
+    }
+    .tick-label {
+      position: absolute;
+      font-size: 10px;
+      color: #999;
+      white-space: nowrap;
+    }
+    .tick-label-x {
+      top: 100%;
+      margin-top: 6px;
+      transform: translateX(-50%);
+    }
+    .tick-label-y {
+      right: 100%;
+      margin-right: 8px;
+      transform: translateY(50%);
+    }
+    .avg-line {
+      position: absolute;
+      z-index: 1;
+    }
+    .avg-line-x {
+      top: 0;
+      bottom: 0;
+      width: 1.5px;
+      background: rgba(37,112,193,0.4);
+      border-left: 1.5px dashed rgba(37,112,193,0.4);
+      background: none;
+    }
+    .avg-line-y {
+      left: 0;
+      right: 0;
+      height: 1.5px;
+      border-top: 1.5px dashed rgba(196,72,32,0.4);
+      background: none;
+    }
+    .avg-label {
+      position: absolute;
+      font-size: 9px;
+      font-weight: 500;
+      padding: 1px 4px;
+      border-radius: 3px;
+      white-space: nowrap;
+      z-index: 2;
+    }
+    .avg-label-x {
+      top: -14px;
+      transform: translateX(-50%);
+      color: rgba(37,112,193,0.8);
+    }
+    .avg-label-y {
+      right: -4px;
+      transform: translate(100%, 50%);
+      color: rgba(196,72,32,0.8);
+    }
+    /* Player dots */
+    .player-dot {
+      position: absolute;
+      border-radius: 50%;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s ease, z-index 0s;
+      z-index: 3;
+    }
+    .player-dot:hover {
+      transform: scale(2.5);
+      z-index: 100;
+    }
+    .player-dot img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: 50% 18%;
+      display: block;
+    }
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      padding: 10px 14px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+      min-width: 160px;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    .tooltip-name {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+    .tooltip-meta {
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+    .tooltip-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tooltip-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .tooltip-stat-label { color: #888; }
+    .tooltip-stat-value { font-weight: 600; }
+    @media (max-width: 800px) {
+      body { padding: 12px; }
+      .controls-row { gap: 10px; }
+      .control-group select, .control-group input[type="number"] { min-width: 100px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pitcher Scatter Plot</h1>
+    <div class="controls-card">
+      <div class="controls-row">
+        <div class="control-group">
+          <label>Season</label>
+          <input type="number" id="sel-season" min="2000" max="2100">
+        </div>
+        <div class="control-group">
+          <label>Pitcher Type</label>
+          <select id="sel-stats">
+            <option value="pit">All Pitchers</option>
+            <option value="sta">Starters only</option>
+            <option value="rel">Relievers only</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>League</label>
+          <select id="sel-lg">
+            <option value="all">All</option>
+            <option value="al">AL only</option>
+            <option value="nl">NL only</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Handedness</label>
+          <select id="sel-hand">
+            <option value="">All</option>
+            <option value="L">LHP</option>
+            <option value="R">RHP</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Min IP</label>
+          <select id="sel-qual">
+            <option value="y">Qualified</option>
+            <option value="0">No minimum</option>
+            <option value="20">20 IP</option>
+            <option value="40">40 IP</option>
+            <option value="80">80 IP</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>X Axis</label>
+          <select id="sel-x"></select>
+        </div>
+        <div class="control-group">
+          <label>Y Axis</label>
+          <select id="sel-y"></select>
+        </div>
+        <div class="control-group">
+          <label>&nbsp;</label>
+          <button id="btn-generate">Generate</button>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-status" id="chart-status">Select options and click Generate</div>
+      <div class="chart-area" id="chart-area">
+        <div class="axis-label axis-label-x" id="axis-label-x"></div>
+        <div class="axis-label axis-label-y" id="axis-label-y"></div>
+        <div class="plot-area" id="plot-area"></div>
+      </div>
+    </div>
+  </div>
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-name" id="tt-name"></div>
+    <div class="tooltip-meta" id="tt-meta"></div>
+    <div class="tooltip-stats" id="tt-stats"></div>
+  </div>
+
+<script>
+const PROXY = 'https://fg-proxy.vercel.app/api/fangraphs';
+
+const STAT_OPTIONS = [
+  { key: 'ERA',    label: 'ERA' },
+  { key: 'FIP',    label: 'FIP' },
+  { key: 'xFIP',   label: 'xFIP' },
+  { key: 'SIERA',  label: 'SIERA' },
+  { key: 'WAR',    label: 'WAR' },
+  { key: 'IP',     label: 'IP' },
+  { key: 'K%',     label: 'K%' },
+  { key: 'BB%',    label: 'BB%' },
+  { key: 'K-BB%',  label: 'K-BB%' },
+  { key: 'WHIP',   label: 'WHIP' },
+  { key: 'BABIP',  label: 'BABIP' },
+  { key: 'LOB%',   label: 'LOB%' },
+  { key: 'HR/9',   label: 'HR/9' },
+  { key: 'BB/9',   label: 'BB/9' },
+  { key: 'K/9',    label: 'K/9' },
+  { key: 'GB%',    label: 'GB%' },
+  { key: 'FB%',    label: 'FB%' },
+  { key: 'HR/FB',  label: 'HR/FB' },
+  { key: 'SwStr%', label: 'SwStr%' },
+  { key: 'CSW%',   label: 'CSW%' },
+  { key: 'ERA-',   label: 'ERA-' },
+  { key: 'FIP-',   label: 'FIP-' },
+  { key: 'xFIP-',  label: 'xFIP-' },
+];
+
+// State
+let currentData = null;
+let currentXKey = null;
+let currentYKey = null;
+
+// Elements
+const selSeason = document.getElementById('sel-season');
+const selStats = document.getElementById('sel-stats');
+const selLg = document.getElementById('sel-lg');
+const selHand = document.getElementById('sel-hand');
+const selQual = document.getElementById('sel-qual');
+const selX = document.getElementById('sel-x');
+const selY = document.getElementById('sel-y');
+const btnGenerate = document.getElementById('btn-generate');
+const chartStatus = document.getElementById('chart-status');
+const chartArea = document.getElementById('chart-area');
+const plotArea = document.getElementById('plot-area');
+const tooltip = document.getElementById('tooltip');
+const ttName = document.getElementById('tt-name');
+const ttMeta = document.getElementById('tt-meta');
+const ttStats = document.getElementById('tt-stats');
+const axisLabelX = document.getElementById('axis-label-x');
+const axisLabelY = document.getElementById('axis-label-y');
+
+// Init
+(function init() {
+  selSeason.value = new Date().getFullYear();
+  STAT_OPTIONS.forEach(s => {
+    selX.appendChild(new Option(s.label, s.key));
+    selY.appendChild(new Option(s.label, s.key));
+  });
+  selX.value = 'SwStr%';
+  selY.value = 'ERA';
+  btnGenerate.addEventListener('click', generate);
+
+  // Resize observer
+  let resizeTimer;
+  const ro = new ResizeObserver(() => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(rerenderLayout, 60);
+  });
+  ro.observe(chartArea);
+})();
+
+function headshotUrl(mlbamId) {
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_60,q_auto:best/v1/people/${mlbamId}/headshot/67/current`;
+}
+
+async function generate() {
+  const season = selSeason.value;
+  const params = new URLSearchParams({
+    pos: 'all',
+    stats: selStats.value,
+    lg: selLg.value,
+    qual: selQual.value,
+    type: '8',
+    season: season,
+    season1: season,
+    month: '0',
+    ind: '0',
+    hand: selHand.value,
+    team: '0',
+    pageitems: '10000',
+    pagenum: '1',
+    sortstat: 'WAR',
+    sortdir: 'default'
+  });
+
+  btnGenerate.disabled = true;
+  chartStatus.textContent = 'Loading...';
+  chartStatus.classList.remove('error');
+  chartStatus.style.display = 'flex';
+  plotArea.innerHTML = '';
+
+  try {
+    const resp = await fetch(`${PROXY}?${params}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (json.error) throw new Error(json.error);
+    const players = json.data;
+    if (!players || !players.length) throw new Error('No data returned');
+
+    currentData = players;
+    currentXKey = selX.value;
+    currentYKey = selY.value;
+    chartStatus.style.display = 'none';
+    rerenderLayout();
+  } catch (e) {
+    chartStatus.textContent = `Error: ${e.message}`;
+    chartStatus.classList.add('error');
+    chartStatus.style.display = 'flex';
+    currentData = null;
+  } finally {
+    btnGenerate.disabled = false;
+  }
+}
+
+function rerenderLayout() {
+  if (!currentData) return;
+  plotArea.innerHTML = '';
+
+  const xKey = currentXKey;
+  const yKey = currentYKey;
+
+  // Filter valid data
+  const valid = currentData.filter(p => {
+    const xv = p[xKey], yv = p[yKey];
+    return xv != null && yv != null && isFinite(xv) && isFinite(yv) && p.xMLBAMID && p.xMLBAMID !== 0;
+  });
+
+  if (!valid.length) {
+    chartStatus.textContent = 'No valid data for selected axes';
+    chartStatus.style.display = 'flex';
+    return;
+  }
+
+  // Axis labels
+  const xLabel = STAT_OPTIONS.find(s => s.key === xKey)?.label || xKey;
+  const yLabel = STAT_OPTIONS.find(s => s.key === yKey)?.label || yKey;
+  axisLabelX.textContent = xLabel;
+  axisLabelY.textContent = yLabel;
+
+  // Compute ranges with 5% padding
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  let xSum = 0, ySum = 0;
+  for (const p of valid) {
+    const xv = p[xKey], yv = p[yKey];
+    if (xv < xMin) xMin = xv;
+    if (xv > xMax) xMax = xv;
+    if (yv < yMin) yMin = yv;
+    if (yv > yMax) yMax = yv;
+    xSum += xv;
+    ySum += yv;
+  }
+  const xAvg = xSum / valid.length;
+  const yAvg = ySum / valid.length;
+  const xPad = (xMax - xMin) * 0.05 || 0.5;
+  const yPad = (yMax - yMin) * 0.05 || 0.5;
+  xMin -= xPad; xMax += xPad;
+  yMin -= yPad; yMax += yPad;
+
+  // Plot dimensions
+  const plotW = plotArea.clientWidth;
+  const plotH = Math.max(400, window.innerHeight - 300);
+  plotArea.style.height = plotH + 'px';
+
+  // Dot size
+  const dotSize = Math.round(Math.min(32, Math.max(28, plotW / 40)));
+
+  // Nice tick generation
+  function niceTicks(min, max, count) {
+    const range = max - min;
+    const rough = range / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const nice = [1, 2, 2.5, 5, 10].find(n => n * mag >= rough) * mag;
+    const start = Math.ceil(min / nice) * nice;
+    const ticks = [];
+    for (let t = start; t <= max + nice * 0.001; t += nice) {
+      ticks.push(Math.round(t * 1e6) / 1e6);
+    }
+    return ticks;
+  }
+
+  const xTicks = niceTicks(xMin, xMax, 8);
+  const yTicks = niceTicks(yMin, yMax, 6);
+
+  // Grid lines + tick labels
+  for (const t of xTicks) {
+    const pct = (t - xMin) / (xMax - xMin);
+    const px = pct * plotW;
+    const gl = document.createElement('div');
+    gl.className = 'grid-line grid-line-v';
+    gl.style.left = px + 'px';
+    plotArea.appendChild(gl);
+    const tl = document.createElement('div');
+    tl.className = 'tick-label tick-label-x';
+    tl.style.left = px + 'px';
+    tl.textContent = formatStat(t, xKey);
+    plotArea.appendChild(tl);
+  }
+  for (const t of yTicks) {
+    const pct = 1 - (t - yMin) / (yMax - yMin);
+    const py = pct * plotH;
+    const gl = document.createElement('div');
+    gl.className = 'grid-line grid-line-h';
+    gl.style.top = py + 'px';
+    plotArea.appendChild(gl);
+    const tl = document.createElement('div');
+    tl.className = 'tick-label tick-label-y';
+    tl.style.top = py + 'px';
+    tl.textContent = formatStat(t, yKey);
+    plotArea.appendChild(tl);
+  }
+
+  // Average lines
+  const xAvgPx = ((xAvg - xMin) / (xMax - xMin)) * plotW;
+  const yAvgPx = (1 - (yAvg - yMin) / (yMax - yMin)) * plotH;
+
+  const avgLineX = document.createElement('div');
+  avgLineX.className = 'avg-line avg-line-x';
+  avgLineX.style.left = xAvgPx + 'px';
+  plotArea.appendChild(avgLineX);
+
+  const avgLabelX = document.createElement('div');
+  avgLabelX.className = 'avg-label avg-label-x';
+  avgLabelX.style.left = xAvgPx + 'px';
+  avgLabelX.textContent = `avg ${formatStat(xAvg, xKey)}`;
+  plotArea.appendChild(avgLabelX);
+
+  const avgLineY = document.createElement('div');
+  avgLineY.className = 'avg-line avg-line-y';
+  avgLineY.style.top = yAvgPx + 'px';
+  plotArea.appendChild(avgLineY);
+
+  const avgLabelY = document.createElement('div');
+  avgLabelY.className = 'avg-label avg-label-y';
+  avgLabelY.style.top = yAvgPx + 'px';
+  avgLabelY.textContent = `avg ${formatStat(yAvg, yKey)}`;
+  plotArea.appendChild(avgLabelY);
+
+  // Player dots
+  const half = dotSize / 2;
+  for (const p of valid) {
+    const xPct = (p[xKey] - xMin) / (xMax - xMin);
+    const yPct = 1 - (p[yKey] - yMin) / (yMax - yMin);
+    const left = xPct * plotW - half;
+    const top = yPct * plotH - half;
+
+    const dot = document.createElement('div');
+    dot.className = 'player-dot';
+    dot.style.width = dotSize + 'px';
+    dot.style.height = dotSize + 'px';
+    dot.style.left = left + 'px';
+    dot.style.top = top + 'px';
+
+    const img = document.createElement('img');
+    img.src = headshotUrl(p.xMLBAMID);
+    img.alt = p.PlayerName;
+    img.loading = 'lazy';
+    dot.appendChild(img);
+
+    // Tooltip events
+    dot.addEventListener('mouseenter', (e) => showTooltip(e, p, xKey, yKey, xLabel, yLabel));
+    dot.addEventListener('mousemove', moveTooltip);
+    dot.addEventListener('mouseleave', hideTooltip);
+
+    plotArea.appendChild(dot);
+  }
+}
+
+function formatStat(val, key) {
+  if (key.includes('%')) return (val * 1).toFixed(1) + '%';
+  if (['ERA','FIP','xFIP','SIERA','WHIP','BABIP','HR/9','BB/9','K/9','HR/FB'].includes(key)) return val.toFixed(2);
+  if (['WAR','IP'].includes(key)) return val.toFixed(1);
+  if (['ERA-','FIP-','xFIP-'].includes(key)) return Math.round(val);
+  return Number.isInteger(val) ? val : val.toFixed(2);
+}
+
+function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
+  ttName.textContent = player.PlayerName;
+  ttMeta.textContent = `${player.team_name || ''}  |  ${player.Throws || ''}  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+  ttStats.innerHTML = `
+    <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(player[xKey], xKey)}</span></div>
+    <div class="tooltip-stat"><span class="tooltip-stat-label">${yLabel}</span><span class="tooltip-stat-value">${formatStat(player[yKey], yKey)}</span></div>
+  `;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+
+function moveTooltip(e) {
+  const pad = 14;
+  let x = e.clientX + pad;
+  let y = e.clientY + pad;
+  const tw = tooltip.offsetWidth;
+  const th = tooltip.offsetHeight;
+  if (x + tw > window.innerWidth - 8) x = e.clientX - tw - pad;
+  if (y + th > window.innerHeight - 8) y = e.clientY - th - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+</script>
+</body>
+</html>
