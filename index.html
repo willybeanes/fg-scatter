@@ -598,6 +598,19 @@ const btnReset = document.getElementById('btn-reset');
     resizeTimer = setTimeout(rerenderLayout, 60);
   });
   ro.observe(chartArea);
+
+  // Load state from URL params and auto-generate
+  const urlP = new URLSearchParams(window.location.search);
+  if (urlP.has('season')) selSeason.value = urlP.get('season');
+  if (urlP.has('stats')) selStats.value = urlP.get('stats');
+  if (urlP.has('lg')) selLg.value = urlP.get('lg');
+  if (urlP.has('hand')) selHand.value = urlP.get('hand');
+  if (urlP.has('qual')) selQual.value = urlP.get('qual');
+  if (urlP.has('team')) selTeam.value = urlP.get('team');
+  if (urlP.has('group')) selGroup.value = urlP.get('group');
+  if (urlP.has('x')) selX.value = urlP.get('x');
+  if (urlP.has('y')) selY.value = urlP.get('y');
+  if (urlP.has('season') || urlP.has('x') || urlP.has('y')) generate();
 })();
 
 function headshotUrl(mlbamId) {
@@ -623,6 +636,14 @@ async function generate() {
     sortstat: 'WAR',
     sortdir: 'default'
   });
+
+  // Update URL with current state
+  const urlState = new URLSearchParams({
+    season, stats: selStats.value, lg: selLg.value, hand: selHand.value,
+    qual: selQual.value, team: selTeam.value, group: selGroup.value,
+    x: selX.value, y: selY.value
+  });
+  history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
   chartStatus.textContent = 'Loading...';
