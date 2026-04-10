@@ -308,10 +308,55 @@
           <label>Min IP</label>
           <select id="sel-qual">
             <option value="y">Qualified</option>
-            <option value="0">No minimum</option>
-            <option value="20">20 IP</option>
-            <option value="40">40 IP</option>
-            <option value="80">80 IP</option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+            <option value="40">40</option>
+            <option value="50">50</option>
+            <option value="60">60</option>
+            <option value="80">80</option>
+            <option value="100">100</option>
+            <option value="120">120</option>
+            <option value="140">140</option>
+            <option value="160">160</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Team</label>
+          <select id="sel-team">
+            <option value="0">All Teams</option>
+            <option value="15">ARI</option>
+            <option value="2">BAL</option>
+            <option value="3">BOS</option>
+            <option value="17">CHC</option>
+            <option value="4">CHW</option>
+            <option value="18">CIN</option>
+            <option value="5">CLE</option>
+            <option value="19">COL</option>
+            <option value="6">DET</option>
+            <option value="21">HOU</option>
+            <option value="7">KCR</option>
+            <option value="1">LAA</option>
+            <option value="22">LAD</option>
+            <option value="20">MIA</option>
+            <option value="23">MIL</option>
+            <option value="8">MIN</option>
+            <option value="25">NYM</option>
+            <option value="9">NYY</option>
+            <option value="10">OAK</option>
+            <option value="26">PHI</option>
+            <option value="27">PIT</option>
+            <option value="29">SDP</option>
+            <option value="30">SFG</option>
+            <option value="11">SEA</option>
+            <option value="28">STL</option>
+            <option value="12">TBR</option>
+            <option value="13">TEX</option>
+            <option value="14">TOR</option>
+            <option value="24">WSN</option>
           </select>
         </div>
         <div class="control-group">
@@ -432,6 +477,7 @@ const selStats = document.getElementById('sel-stats');
 const selLg = document.getElementById('sel-lg');
 const selHand = document.getElementById('sel-hand');
 const selQual = document.getElementById('sel-qual');
+const selTeam = document.getElementById('sel-team');
 const selX = document.getElementById('sel-x');
 const selY = document.getElementById('sel-y');
 const btnGenerate = document.getElementById('btn-generate');
@@ -486,7 +532,7 @@ async function generate() {
     month: '0',
     ind: '0',
     hand: selHand.value,
-    team: '0',
+    team: selTeam.value,
     pageitems: '10000',
     pagenum: '1',
     sortstat: 'WAR',
