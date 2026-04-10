@@ -506,7 +506,7 @@ const STAT_GROUPS_HITTING = [
   { group: 'Summary', stats: [
     { key: 'Age', label: 'Age' }, { key: 'AVG', label: 'AVG' }, { key: 'OBP', label: 'OBP' },
     { key: 'SLG', label: 'SLG' }, { key: 'OPS', label: 'OPS' }, { key: 'ISO', label: 'ISO' },
-    { key: 'wOBA', label: 'wOBA' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'wRC+', label: 'wRC+' },
+    { key: 'wOBA', label: 'wOBA' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xSLG', label: 'xSLG' }, { key: 'wRC+', label: 'wRC+' },
     { key: 'WAR', label: 'WAR' }, { key: 'RAR', label: 'RAR' },
     { key: 'Batting', label: 'Batting' }, { key: 'Offense', label: 'Offense' },
   ]},
@@ -1038,7 +1038,7 @@ function displayVal(val, key) {
 }
 
 // Stats displayed as .xxx (batting average format)
-const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','BABIP']);
+const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG','BABIP']);
 
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
