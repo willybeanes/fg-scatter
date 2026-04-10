@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FanGraphs Pitcher Scatter</title>
+  <title>FanGraphs Scatter Plot</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚾</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,11 +21,29 @@
       max-width: 1400px;
       margin: 0 auto;
     }
-    h1 {
-      font-size: 22px;
-      font-weight: 600;
+    .tab-bar {
+      display: flex;
+      gap: 0;
       margin-bottom: 20px;
+    }
+    .tab {
+      font-family: inherit;
+      font-size: 18px;
+      font-weight: 500;
+      padding: 10px 24px;
+      background: none;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      color: #999;
+      cursor: pointer;
       letter-spacing: -0.3px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab:hover { color: #666; }
+    .tab.active {
+      color: #1a1a1a;
+      font-weight: 600;
+      border-bottom-color: #1a1a1a;
     }
     .controls-card {
       background: #fff;
@@ -283,7 +301,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>Pitcher Scatter Plot</h1>
+    <div class="tab-bar">
+      <button class="tab active" data-mode="pitching">Pitcher Scatter Plot</button>
+      <button class="tab" data-mode="hitting">Hitter Scatter Plot</button>
+    </div>
     <div class="controls-card">
       <div class="controls-row">
         <div class="control-group">
@@ -409,7 +430,7 @@
 <script>
 const PROXY = 'https://fg-proxy.vercel.app/api/fangraphs';
 
-const STAT_GROUPS = [
+const STAT_GROUPS_PITCHING = [
   { group: 'Summary', stats: [
     { key: 'Age', label: 'Age' }, { key: 'ERA', label: 'ERA' }, { key: 'FIP', label: 'FIP' },
     { key: 'xFIP', label: 'xFIP' }, { key: 'SIERA', label: 'SIERA' }, { key: 'xERA', label: 'xERA' },
@@ -481,8 +502,65 @@ const STAT_GROUPS = [
   ]},
 ];
 
-// Flat list for lookups
-const STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
+const STAT_GROUPS_HITTING = [
+  { group: 'Summary', stats: [
+    { key: 'Age', label: 'Age' }, { key: 'AVG', label: 'AVG' }, { key: 'OBP', label: 'OBP' },
+    { key: 'SLG', label: 'SLG' }, { key: 'OPS', label: 'OPS' }, { key: 'ISO', label: 'ISO' },
+    { key: 'wOBA', label: 'wOBA' }, { key: 'wRC+', label: 'wRC+' },
+    { key: 'WAR', label: 'WAR' }, { key: 'RAR', label: 'RAR' },
+    { key: 'Batting', label: 'Batting' }, { key: 'Offense', label: 'Offense' },
+  ]},
+  { group: 'Counting', stats: [
+    { key: 'G', label: 'G' }, { key: 'AB', label: 'AB' }, { key: 'PA', label: 'PA' },
+    { key: 'H', label: 'H' }, { key: '1B', label: '1B' }, { key: '2B', label: '2B' },
+    { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' }, { key: 'R', label: 'R' },
+    { key: 'RBI', label: 'RBI' }, { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' },
+    { key: 'SO', label: 'SO' }, { key: 'HBP', label: 'HBP' }, { key: 'SF', label: 'SF' },
+    { key: 'SH', label: 'SH' }, { key: 'GDP', label: 'GDP' }, { key: 'SB', label: 'SB' },
+    { key: 'CS', label: 'CS' },
+  ]},
+  { group: 'Rate', stats: [
+    { key: 'BB%', label: 'BB%' }, { key: 'K%', label: 'K%' }, { key: 'BB/K', label: 'BB/K' },
+    { key: 'AVG', label: 'AVG' }, { key: 'BABIP', label: 'BABIP' },
+    { key: 'OBP', label: 'OBP' }, { key: 'SLG', label: 'SLG' }, { key: 'ISO', label: 'ISO' },
+    { key: 'TTO%', label: 'TTO%' },
+  ]},
+  { group: 'Batted Ball', stats: [
+    { key: 'GB/FB', label: 'GB/FB' }, { key: 'GB%', label: 'GB%' }, { key: 'FB%', label: 'FB%' },
+    { key: 'LD%', label: 'LD%' }, { key: 'IFFB%', label: 'IFFB%' }, { key: 'HR/FB', label: 'HR/FB' },
+    { key: 'Pull%', label: 'Pull%' }, { key: 'Cent%', label: 'Cent%' }, { key: 'Oppo%', label: 'Oppo%' },
+    { key: 'Soft%', label: 'Soft%' }, { key: 'Med%', label: 'Med%' }, { key: 'Hard%', label: 'Hard%' },
+  ]},
+  { group: 'Win Probability', stats: [
+    { key: 'WPA', label: 'WPA' }, { key: '-WPA', label: '-WPA' }, { key: '+WPA', label: '+WPA' },
+    { key: 'RE24', label: 'RE24' }, { key: 'Clutch', label: 'Clutch' },
+  ]},
+  { group: 'Plate Discipline', stats: [
+    { key: 'O-Swing%', label: 'O-Swing%' }, { key: 'Z-Swing%', label: 'Z-Swing%' },
+    { key: 'Swing%', label: 'Swing%' }, { key: 'O-Contact%', label: 'O-Contact%' },
+    { key: 'Z-Contact%', label: 'Z-Contact%' }, { key: 'Contact%', label: 'Contact%' },
+    { key: 'Zone%', label: 'Zone%' }, { key: 'F-Strike%', label: 'F-Strike%' },
+    { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
+  ]},
+  { group: 'Baserunning', stats: [
+    { key: 'SB', label: 'SB' }, { key: 'CS', label: 'CS' },
+    { key: 'BaseRunning', label: 'BsR' }, { key: 'Spd', label: 'Spd' },
+  ]},
+  { group: 'Batted Ball Quality', stats: [
+    { key: 'EV', label: 'EV' }, { key: 'LA', label: 'LA' },
+    { key: 'Barrel%', label: 'Barrel%' }, { key: 'HardHit%', label: 'HardHit%' },
+    { key: 'maxEV', label: 'maxEV' },
+  ]},
+  { group: 'Plus Stats', stats: [
+    { key: 'AVG+', label: 'AVG+' }, { key: 'BB%+', label: 'BB%+' }, { key: 'K%+', label: 'K%+' },
+    { key: 'OBP+', label: 'OBP+' }, { key: 'SLG+', label: 'SLG+' },
+    { key: 'ISO+', label: 'ISO+' }, { key: 'BABIP+', label: 'BABIP+' },
+  ]},
+];
+
+// Active stat groups (swapped when mode changes)
+let STAT_GROUPS = STAT_GROUPS_PITCHING;
+let STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
 
 // FanGraphs abbr → ESPN abbr mapping
 const TEAM_LOGO_ABBR = {
@@ -505,16 +583,20 @@ const COUNTING_STATS = new Set([
   'BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls',
   'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
   'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
+  // Batting counting stats
+  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS',
 ]);
 
 function aggregateByTeam(players) {
+  const isHit = currentMode === 'hitting';
+  const weightKey = isHit ? 'PA' : 'IP';
   const teams = {};
   for (const p of players) {
     const abbr = p.TeamNameAbb || p.TeamName || '';
     if (!abbr) continue;
-    if (!teams[abbr]) teams[abbr] = { players: [], totalIP: 0 };
+    if (!teams[abbr]) teams[abbr] = { players: [], totalWeight: 0 };
     teams[abbr].players.push(p);
-    teams[abbr].totalIP += (p.IP || 0);
+    teams[abbr].totalWeight += (p[weightKey] || 0);
   }
   // Remove multi-team entries like "2 Tms", "3 Tms"
   for (const key of Object.keys(teams)) {
@@ -522,22 +604,26 @@ function aggregateByTeam(players) {
   }
   return Object.entries(teams).map(([abbr, t]) => {
     const agg = { _isTeam: true, TeamNameAbb: abbr, TeamName: abbr, PlayerName: abbr };
-    // Get all numeric keys from first player
     const keys = Object.keys(t.players[0]).filter(k => typeof t.players[0][k] === 'number');
     for (const k of keys) {
       if (COUNTING_STATS.has(k)) {
         agg[k] = t.players.reduce((s, p) => s + (p[k] || 0), 0);
       } else {
-        // IP-weighted average for rate stats
-        if (t.totalIP > 0) {
-          agg[k] = t.players.reduce((s, p) => s + (p[k] || 0) * (p.IP || 0), 0) / t.totalIP;
+        // Weight by PA (hitting) or IP (pitching) for rate stats
+        if (t.totalWeight > 0) {
+          agg[k] = t.players.reduce((s, p) => s + (p[k] || 0) * (p[weightKey] || 0), 0) / t.totalWeight;
         } else {
           agg[k] = t.players.reduce((s, p) => s + (p[k] || 0), 0) / t.players.length;
         }
       }
     }
-    agg.IP = t.totalIP;
-    agg._pitcherCount = t.players.length;
+    agg[weightKey] = t.totalWeight;
+    if (isHit) {
+      agg._hitterCount = t.players.length;
+    } else {
+      agg.IP = t.totalWeight;
+      agg._pitcherCount = t.players.length;
+    }
     return agg;
   });
 }
@@ -548,6 +634,7 @@ let currentXKey = null;
 let currentYKey = null;
 let currentGroupBy = 'player';
 let hiddenKeys = new Set(); // tracks dismissed players/teams
+let currentMode = 'pitching'; // 'pitching' or 'hitting'
 
 // Elements
 const selSeason = document.getElementById('sel-season');
@@ -571,10 +658,25 @@ const axisLabelX = document.getElementById('axis-label-x');
 const axisLabelY = document.getElementById('axis-label-y');
 const btnReset = document.getElementById('btn-reset');
 
-// Init
-(function init() {
-  selSeason.value = new Date().getFullYear();
+const PITCHING_TYPE_OPTIONS = [
+  { value: 'pit', label: 'All Pitchers' },
+  { value: 'sta', label: 'Starters only' },
+  { value: 'rel', label: 'Relievers only' },
+];
+const HITTING_POS_OPTIONS = [
+  { value: 'all', label: 'All Hitters' },
+  { value: 'c', label: 'C' },
+  { value: '1b', label: '1B' },
+  { value: '2b', label: '2B' },
+  { value: 'ss', label: 'SS' },
+  { value: '3b', label: '3B' },
+  { value: 'of', label: 'OF' },
+  { value: 'dh', label: 'DH' },
+];
+
+function populateAxisDropdowns() {
   for (const sel of [selX, selY]) {
+    sel.innerHTML = '';
     STAT_GROUPS.forEach(g => {
       const og = document.createElement('optgroup');
       og.label = g.group;
@@ -582,9 +684,51 @@ const btnReset = document.getElementById('btn-reset');
       sel.appendChild(og);
     });
   }
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  // Update tabs
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.mode === mode);
+  });
+  // Swap stat groups
+  STAT_GROUPS = mode === 'hitting' ? STAT_GROUPS_HITTING : STAT_GROUPS_PITCHING;
+  STAT_OPTIONS = STAT_GROUPS.flatMap(g => g.stats);
+  // Repopulate axis dropdowns
+  populateAxisDropdowns();
+  selX.value = mode === 'hitting' ? 'wRC+' : 'SwStr%';
+  selY.value = mode === 'hitting' ? 'WAR' : 'ERA';
+  // Swap type/position dropdown
+  const label = selStats.closest('.control-group').querySelector('label');
+  selStats.innerHTML = '';
+  if (mode === 'hitting') {
+    label.textContent = 'Position';
+    HITTING_POS_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
+  } else {
+    label.textContent = 'Pitcher Type';
+    PITCHING_TYPE_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
+  }
+  // Clear chart
+  currentData = null;
+  plotArea.innerHTML = '';
+  chartStatus.textContent = 'Select options and click Generate';
+  chartStatus.style.display = 'flex';
+  hiddenKeys.clear();
+  btnReset.style.display = 'none';
+}
+
+// Init
+(function init() {
+  selSeason.value = new Date().getFullYear();
+  populateAxisDropdowns();
   selX.value = 'SwStr%';
   selY.value = 'ERA';
   btnGenerate.addEventListener('click', generate);
+  // Tab click handlers
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+  });
   selGroup.addEventListener('change', () => {
     const isTeam = selGroup.value === 'team';
     selQual.disabled = isTeam;
@@ -606,6 +750,7 @@ const btnReset = document.getElementById('btn-reset');
 
   // Load state from URL params and auto-generate
   const urlP = new URLSearchParams(window.location.search);
+  if (urlP.get('mode') === 'hitting') switchMode('hitting');
   if (urlP.has('season')) selSeason.value = urlP.get('season');
   if (urlP.has('stats')) selStats.value = urlP.get('stats');
   if (urlP.has('lg')) selLg.value = urlP.get('lg');
@@ -628,9 +773,10 @@ function headshotUrl(mlbamId) {
 async function generate() {
   const season = selSeason.value;
   const isTeam = selGroup.value === 'team';
+  const isHitting = currentMode === 'hitting';
   const params = new URLSearchParams({
-    pos: 'all',
-    stats: selStats.value,
+    pos: isHitting ? selStats.value : 'all',
+    stats: isHitting ? 'bat' : selStats.value,
     lg: selLg.value,
     qual: isTeam ? '0' : selQual.value,
     type: '4',
@@ -648,7 +794,7 @@ async function generate() {
 
   // Update URL with current state
   const urlState = new URLSearchParams({
-    season, stats: selStats.value, lg: selLg.value, hand: selHand.value,
+    mode: currentMode, season, stats: selStats.value, lg: selLg.value, hand: selHand.value,
     qual: selQual.value, team: selTeam.value, group: selGroup.value,
     x: selX.value, y: selY.value
   });
@@ -869,6 +1015,10 @@ const PCT_KEYS = new Set([
   'CStr%','CSW%','IFH%','BUH%','TTO%','AVG',
   'pfxFA%','pfxFT%','pfxFC%','pfxFS%','pfxFO%','pfxSI%','pfxSL%','pfxCU%',
   'pfxKC%','pfxEP%','pfxCH%','pfxSC%','pfxKN%','pfxUN%',
+  // Batting-specific
+  'OBP','SLG','OPS','ISO','wOBA',
+  'Pull%','Cent%','Oppo%','Soft%','Med%','Hard%',
+  'Barrel%','HardHit%','BB/K',
 ]);
 
 function displayVal(val, key) {
@@ -878,21 +1028,27 @@ function displayVal(val, key) {
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
   if (PCT_KEYS.has(key)) return v.toFixed(1) + '%';
-  if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB'].includes(key)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR'].includes(key)) return v.toFixed(1);
-  if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching'].includes(key)) return Math.round(v);
+  if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd'].includes(key)) return v.toFixed(2);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC'].includes(key)) return v.toFixed(1);
+  if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(key)) return Math.round(v);
   if (key.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(key)) return v.toFixed(0);
-  if (['W','L','G','GS','CG','ShO','SV','HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD'].includes(key)) return Math.round(v);
+  if (['W','L','G','GS','CG','ShO','SV','HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS'].includes(key)) return Math.round(v);
   return Number.isInteger(v) ? v : v.toFixed(2);
 }
 
 function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   ttName.textContent = player.PlayerName;
+  const isHit = currentMode === 'hitting';
   if (player._isTeam) {
-    ttMeta.textContent = `${player._pitcherCount} pitchers  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+    const count = player._pitcherCount || player._hitterCount || 0;
+    const label = isHit ? 'hitters' : 'pitchers';
+    const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
+    ttMeta.textContent = `${count} ${label}  |  ${vol}`;
   } else {
-    ttMeta.textContent = `${player.TeamName || player.TeamNameAbb || ''}  |  ${player.Throws || ''}  |  ${formatStat(player.IP || 0, 'IP')} IP`;
+    const hand = isHit ? (player.Bats || '') : (player.Throws || '');
+    const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
+    ttMeta.textContent = `${player.TeamName || player.TeamNameAbb || ''}  |  ${hand}  |  ${vol}`;
   }
   ttStats.innerHTML = `
     <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[xKey], xKey), xKey)}</span></div>
