@@ -585,6 +585,11 @@ const btnReset = document.getElementById('btn-reset');
   selX.value = 'SwStr%';
   selY.value = 'ERA';
   btnGenerate.addEventListener('click', generate);
+  selGroup.addEventListener('change', () => {
+    const isTeam = selGroup.value === 'team';
+    selQual.disabled = isTeam;
+    selQual.style.opacity = isTeam ? '0.4' : '1';
+  });
   btnReset.addEventListener('click', () => {
     hiddenKeys.clear();
     btnReset.style.display = 'none';
@@ -607,7 +612,10 @@ const btnReset = document.getElementById('btn-reset');
   if (urlP.has('hand')) selHand.value = urlP.get('hand');
   if (urlP.has('qual')) selQual.value = urlP.get('qual');
   if (urlP.has('team')) selTeam.value = urlP.get('team');
-  if (urlP.has('group')) selGroup.value = urlP.get('group');
+  if (urlP.has('group')) {
+    selGroup.value = urlP.get('group');
+    if (urlP.get('group') === 'team') { selQual.disabled = true; selQual.style.opacity = '0.4'; }
+  }
   if (urlP.has('x')) selX.value = urlP.get('x');
   if (urlP.has('y')) selY.value = urlP.get('y');
   if (urlP.has('season') || urlP.has('x') || urlP.has('y')) generate();
@@ -619,11 +627,12 @@ function headshotUrl(mlbamId) {
 
 async function generate() {
   const season = selSeason.value;
+  const isTeam = selGroup.value === 'team';
   const params = new URLSearchParams({
     pos: 'all',
     stats: selStats.value,
     lg: selLg.value,
-    qual: selQual.value,
+    qual: isTeam ? '0' : selQual.value,
     type: '4',
     season: season,
     season1: season,
