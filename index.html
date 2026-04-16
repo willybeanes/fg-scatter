@@ -765,6 +765,9 @@ function switchMode(mode) {
       label.textContent = 'Pitcher Type';
       PITCHING_TYPE_OPTIONS.forEach(o => selStats.appendChild(new Option(o.label, o.value)));
     }
+    // Swap handedness labels
+    selHand.options[1].text = mode === 'hitting' ? 'LHB' : 'LHP';
+    selHand.options[2].text = mode === 'hitting' ? 'RHB' : 'RHP';
     // Swap Min IP / Min PA label and options
     const qualLabel = selQual.closest('.control-group').querySelector('label');
     selQual.innerHTML = '';
