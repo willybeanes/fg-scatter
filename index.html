@@ -1249,24 +1249,24 @@ function downloadCSV() {
   });
   if (!rows.length) return;
 
-  // Only include stat columns that have at least one value in the data
-  const statCols = STAT_OPTIONS.filter(s => rows.some(p => p[s.key] != null && isFinite(p[s.key])));
+  // Only the two axes shown on the chart
+  const xLabel = STAT_OPTIONS.find(s => s.key === currentXKey)?.label || currentXKey;
+  const yLabel = STAT_OPTIONS.find(s => s.key === currentYKey)?.label || currentYKey;
 
   // Header row
   const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
-  statCols.forEach(s => headers.push(s.label));
+  headers.push(xLabel, yLabel);
 
-  // Data rows
+  // Data rows — only include rows with valid x and y values
   const csvRows = [headers.join(',')];
   for (const p of rows) {
+    const xv = p[currentXKey], yv = p[currentYKey];
+    if (xv == null || !isFinite(xv) || yv == null || !isFinite(yv)) continue;
     const cols = [];
     if (!isTeamMode) cols.push(JSON.stringify(p.PlayerName || ''));
     cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
-    for (const s of statCols) {
-      const v = p[s.key];
-      if (v == null || !isFinite(v)) { cols.push(''); continue; }
-      cols.push(formatStat(displayVal(v, s.key), s.key));
-    }
+    cols.push(formatStat(displayVal(xv, currentXKey), currentXKey));
+    cols.push(formatStat(displayVal(yv, currentYKey), currentYKey));
     csvRows.push(cols.join(','));
   }
 
