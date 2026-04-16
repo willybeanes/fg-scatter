@@ -313,6 +313,23 @@
           <input type="number" id="sel-season" min="2000" max="2100">
         </div>
         <div class="control-group">
+          <label>Split</label>
+          <select id="sel-split">
+            <option value="0">Full Season</option>
+            <option value="32">Last 7 Days</option>
+            <option value="33">Last 14 Days</option>
+            <option value="34">Last 30 Days</option>
+            <option value="35">First Half</option>
+            <option value="36">Second Half</option>
+            <option value="31">March/April</option>
+            <option value="2">May</option>
+            <option value="3">June</option>
+            <option value="4">July</option>
+            <option value="5">August</option>
+            <option value="6">Sept/Oct</option>
+          </select>
+        </div>
+        <div class="control-group">
           <label>Pitcher Type</label>
           <select id="sel-stats">
             <option value="pit">All Pitchers</option>
@@ -413,7 +430,10 @@
       </div>
     </div>
     <div class="chart-card">
-      <button id="btn-reset" style="display:none;position:absolute;top:12px;right:16px;z-index:10;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#f0ede8;color:#666;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">Reset</button>
+      <div id="chart-actions" style="position:absolute;top:12px;right:16px;z-index:10;display:flex;gap:8px;">
+        <button id="btn-download" style="display:none;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#f0ede8;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
+        <button id="btn-reset" style="display:none;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#f0ede8;color:#666;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">Reset</button>
+      </div>
       <div class="chart-status" id="chart-status">Select options and click Generate</div>
       <div class="chart-area" id="chart-area">
         <div class="axis-label axis-label-x" id="axis-label-x"></div>
@@ -684,7 +704,9 @@ const ttMeta = document.getElementById('tt-meta');
 const ttStats = document.getElementById('tt-stats');
 const axisLabelX = document.getElementById('axis-label-x');
 const axisLabelY = document.getElementById('axis-label-y');
+const selSplit = document.getElementById('sel-split');
 const btnReset = document.getElementById('btn-reset');
+const btnDownload = document.getElementById('btn-download');
 
 const PITCHING_TYPE_OPTIONS = [
   { value: 'pit', label: 'All Pitchers' },
@@ -767,6 +789,7 @@ function switchMode(mode) {
   chartStatus.style.display = 'flex';
   hiddenKeys.clear();
   btnReset.style.display = 'none';
+  btnDownload.style.display = 'none';
 }
 
 // Init
@@ -790,6 +813,7 @@ function switchMode(mode) {
     btnReset.style.display = 'none';
     rerenderLayout();
   });
+  btnDownload.addEventListener('click', downloadCSV);
 
   // Resize observer
   let resizeTimer;
@@ -804,6 +828,7 @@ function switchMode(mode) {
   if (urlP.get('mode') === 'hitting') switchMode('hitting');
   if (urlP.get('mode') === 'combined') switchMode('combined');
   if (urlP.has('season')) selSeason.value = urlP.get('season');
+  if (urlP.has('split')) selSplit.value = urlP.get('split');
   if (urlP.has('stats')) selStats.value = urlP.get('stats');
   if (urlP.has('lg')) selLg.value = urlP.get('lg');
   if (urlP.has('hand')) selHand.value = urlP.get('hand');
@@ -829,7 +854,7 @@ async function generate() {
   const isHitting = currentMode === 'hitting';
 
   // Update URL with current state
-  const urlState = new URLSearchParams({ mode: currentMode, season });
+  const urlState = new URLSearchParams({ mode: currentMode, season, split: selSplit.value });
   if (!isCombined) {
     urlState.set('stats', selStats.value);
     urlState.set('lg', selLg.value);
@@ -843,6 +868,7 @@ async function generate() {
   history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
+  btnDownload.style.display = 'none';
   chartStatus.textContent = 'Loading...';
   chartStatus.classList.remove('error');
   chartStatus.style.display = 'flex';
@@ -853,7 +879,7 @@ async function generate() {
   try {
     if (isCombined) {
       // Fetch team-level batting and pitching data in parallel using team=0,ts
-      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, month: '0', ind: '0', hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
+      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, month: selSplit.value, ind: '0', hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
       const [batResp, pitResp] = await Promise.all([
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'bat' })}`),
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'pit' })}`)
@@ -895,7 +921,7 @@ async function generate() {
         qual: '0',
         type: '4',
         season, season1: season,
-        month: '0', ind: '0',
+        month: selSplit.value, ind: '0',
         hand: selHand.value,
         team: teamParam,
         pageitems: '10000', pagenum: '1',
@@ -922,7 +948,7 @@ async function generate() {
         qual: selQual.value,
         type: '4',
         season, season1: season,
-        month: '0', ind: '0',
+        month: selSplit.value, ind: '0',
         hand: selHand.value,
         team: selTeam.value,
         pageitems: '10000', pagenum: '1',
@@ -941,6 +967,7 @@ async function generate() {
     currentXKey = selX.value;
     currentYKey = selY.value;
     chartStatus.style.display = 'none';
+    btnDownload.style.display = 'block';
     rerenderLayout();
   } catch (e) {
     chartStatus.textContent = `Error: ${e.message}`;
@@ -1206,6 +1233,52 @@ function moveTooltip(e) {
 
 function hideTooltip() {
   tooltip.style.display = 'none';
+}
+
+function downloadCSV() {
+  if (!currentData) return;
+  const isTeamMode = currentGroupBy === 'team';
+
+  // Same visibility filter as the chart
+  function dotKey(p) { return isTeamMode ? p.TeamNameAbb : (p.playerid || p.xMLBAMID); }
+  const rows = currentData.filter(p => {
+    if (hiddenKeys.has(dotKey(p))) return false;
+    if (!isTeamMode && (!p.xMLBAMID || p.xMLBAMID === 0)) return false;
+    return true;
+  });
+  if (!rows.length) return;
+
+  // Only include stat columns that have at least one value in the data
+  const statCols = STAT_OPTIONS.filter(s => rows.some(p => p[s.key] != null && isFinite(p[s.key])));
+
+  // Header row
+  const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
+  statCols.forEach(s => headers.push(s.label));
+
+  // Data rows
+  const csvRows = [headers.join(',')];
+  for (const p of rows) {
+    const cols = [];
+    if (!isTeamMode) cols.push(JSON.stringify(p.PlayerName || ''));
+    cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
+    for (const s of statCols) {
+      const v = p[s.key];
+      if (v == null || !isFinite(v)) { cols.push(''); continue; }
+      cols.push(formatStat(displayVal(v, s.key), s.key));
+    }
+    csvRows.push(cols.join(','));
+  }
+
+  const split = selSplit.options[selSplit.selectedIndex].text.replace(/\s+/g, '-');
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fg-${currentMode}-${selSeason.value}-${split}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 </script>
 </body>
