@@ -459,6 +459,101 @@
 
 <script>
 const PROXY = 'https://fg-proxy.vercel.app/api/fangraphs';
+const SAVANT_PROXY = 'https://fg-proxy.vercel.app/api/savant';
+
+// Stats where Baseball Savant data is fresher than FanGraphs' cached copy.
+// endpoint: which savant leaderboard to call
+// col: CSV column name in the savant response
+// div: divisor to convert savant units → FanGraphs units
+//   (Savant returns Barrel% / HardHit% as 0–100; FanGraphs stores as 0–1 decimal)
+const SAVANT_FIELD_DETAIL = {
+  'EV':       { endpoint: 'statcast',              col: 'avg_hit_speed',  div: 1   },
+  'maxEV':    { endpoint: 'statcast',              col: 'max_hit_speed',  div: 1   },
+  'LA':       { endpoint: 'statcast',              col: 'avg_hit_angle',  div: 1   },
+  'Barrels':  { endpoint: 'statcast',              col: 'barrels',        div: 1   },
+  'Barrel%':  { endpoint: 'statcast',              col: 'brl_percent',    div: 100 },
+  'HardHit':  { endpoint: 'statcast',              col: 'ev95plus',       div: 1   },
+  'HardHit%': { endpoint: 'statcast',              col: 'ev95percent',    div: 100 },
+  'Events':   { endpoint: 'statcast',              col: 'attempts',       div: 1   },
+  'xwOBA':    { endpoint: 'expected_statistics',   col: 'est_woba',       div: 1   },
+  'xSLG':     { endpoint: 'expected_statistics',   col: 'est_slg',        div: 1   },
+  'xERA':     { endpoint: 'expected_statistics',   col: 'xera',           div: 1   },
+};
+const SAVANT_KEYS = new Set(Object.keys(SAVANT_FIELD_DETAIL));
+
+// FanGraphs team abbr → Baseball Savant team abbr (team_id column in savant CSV)
+const FG_TO_SAVANT_TEAM = {
+  'LAA':'LAA','BAL':'BAL','BOS':'BOS','CLE':'CLE','DET':'DET',
+  'KCR':'KC', 'MIN':'MIN','NYY':'NYY','ATH':'ATH','OAK':'OAK',
+  'SEA':'SEA','TBR':'TB', 'TEX':'TEX','TOR':'TOR','ARI':'ARI',
+  'CHC':'CHC','CHW':'CWS','CIN':'CIN','COL':'COL','MIA':'MIA',
+  'HOU':'HOU','LAD':'LAD','MIL':'MIL','WSN':'WSH','NYM':'NYM',
+  'PHI':'PHI','PIT':'PIT','STL':'STL','SDP':'SD', 'SFG':'SF',
+};
+
+// Minimal CSV parser (handles quoted fields)
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const splitLine = s => {
+    const out = []; let cur = '', inQ = false;
+    for (const c of s) {
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    out.push(cur.trim());
+    return out;
+  };
+  const headers = splitLine(lines[0]);
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = splitLine(line);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+    return obj;
+  });
+}
+
+// Fetch one Baseball Savant leaderboard CSV and parse it
+async function fetchSavantLeaderboard(type, endpoint, season) {
+  const params = new URLSearchParams({ path: `/leaderboard/${endpoint}`, type, year: season, min: '0', csv: 'true' });
+  const resp = await fetch(`${SAVANT_PROXY}?${params}`);
+  if (!resp.ok) throw new Error(`Savant HTTP ${resp.status}`);
+  const text = await resp.text();
+  if (text.trim().startsWith('<')) throw new Error('Savant returned HTML (no data)');
+  return parseCSV(text);
+}
+
+// Merge savant data into an array of FG rows.
+// savantData: { statcast: rows|null, expected: rows|null }
+// isTeam: use team_id for matching, else player_id
+// prefix: '' for player/team mode, 'hit_' or 'pit_' for combined mode
+// skipFgKeys: set of FG stat keys to skip (e.g. skip xERA when applying hit_ side)
+function applySavantRows(rows, savantData, isTeam, prefix = '', skipFgKeys = new Set()) {
+  if (!savantData) return rows;
+  const idKey = isTeam ? 'team_id' : 'player_id';
+  const scMap = {}, expMap = {};
+  for (const r of (savantData.statcast || [])) { if (r[idKey]) scMap[r[idKey]] = r; }
+  for (const r of (savantData.expected || [])) { if (r[idKey]) expMap[r[idKey]] = r; }
+
+  return rows.map(p => {
+    const matchId = isTeam
+      ? (FG_TO_SAVANT_TEAM[p.TeamNameAbb] || p.TeamNameAbb)
+      : String(p.xMLBAMID || '');
+    const sc = scMap[matchId] || {};
+    const exp = expMap[matchId] || {};
+    const merged = { ...p };
+    for (const [fgKey, detail] of Object.entries(SAVANT_FIELD_DETAIL)) {
+      if (skipFgKeys.has(fgKey)) continue;
+      const src = detail.endpoint === 'statcast' ? sc : exp;
+      const raw = src[detail.col];
+      if (raw != null && raw !== '' && isFinite(+raw)) {
+        merged[prefix + fgKey] = +raw / detail.div;
+      }
+    }
+    return merged;
+  });
+}
 
 const STAT_GROUPS_PITCHING = [
   { group: 'Summary', stats: [
@@ -1038,6 +1133,45 @@ async function generate() {
       currentGroupBy = 'player';
       currentData = players;
     }
+
+    // Enrich with fresh Baseball Savant data for statcast/xstat metrics
+    const xBk = baseKey(selX.value), yBk = baseKey(selY.value);
+    try {
+      if (isCombined) {
+        // Combined mode: hit_ and pit_ sides fetched separately
+        const xIsHit = selX.value.startsWith('hit_'), yIsHit = selY.value.startsWith('hit_');
+        const xIsPit = selX.value.startsWith('pit_'), yIsPit = selY.value.startsWith('pit_');
+        const hitNeedsSC  = (xIsHit && SAVANT_FIELD_DETAIL[xBk]?.endpoint === 'statcast')          || (yIsHit && SAVANT_FIELD_DETAIL[yBk]?.endpoint === 'statcast');
+        const hitNeedsExp = (xIsHit && SAVANT_FIELD_DETAIL[xBk]?.endpoint === 'expected_statistics') || (yIsHit && SAVANT_FIELD_DETAIL[yBk]?.endpoint === 'expected_statistics');
+        const pitNeedsSC  = (xIsPit && SAVANT_FIELD_DETAIL[xBk]?.endpoint === 'statcast')          || (yIsPit && SAVANT_FIELD_DETAIL[yBk]?.endpoint === 'statcast');
+        const pitNeedsExp = (xIsPit && SAVANT_FIELD_DETAIL[xBk]?.endpoint === 'expected_statistics') || (yIsPit && SAVANT_FIELD_DETAIL[yBk]?.endpoint === 'expected_statistics');
+        const [hitSC, hitExp, pitSC, pitExp] = await Promise.all([
+          hitNeedsSC  ? fetchSavantLeaderboard('batter-team',  'statcast',            season) : null,
+          hitNeedsExp ? fetchSavantLeaderboard('batter-team',  'expected_statistics', season) : null,
+          pitNeedsSC  ? fetchSavantLeaderboard('pitcher-team', 'statcast',            season) : null,
+          pitNeedsExp ? fetchSavantLeaderboard('pitcher-team', 'expected_statistics', season) : null,
+        ].map(p => p instanceof Promise ? p : Promise.resolve(p)));
+        if (hitSC || hitExp) currentData = applySavantRows(currentData, { statcast: hitSC, expected: hitExp }, true, 'hit_', new Set(['xERA']));
+        if (pitSC || pitExp) currentData = applySavantRows(currentData, { statcast: pitSC, expected: pitExp }, true, 'pit_', new Set(['xwOBA','xSLG']));
+      } else {
+        // Player / team mode
+        const needsSC  = SAVANT_FIELD_DETAIL[xBk]?.endpoint === 'statcast'          || SAVANT_FIELD_DETAIL[yBk]?.endpoint === 'statcast';
+        const needsExp = SAVANT_FIELD_DETAIL[xBk]?.endpoint === 'expected_statistics' || SAVANT_FIELD_DETAIL[yBk]?.endpoint === 'expected_statistics';
+        if (needsSC || needsExp) {
+          const playerType = isHitting ? 'batter' : 'pitcher';
+          const type = playerType + (isTeam ? '-team' : '');
+          const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA','xSLG']);
+          const [scRows, expRows] = await Promise.all([
+            needsSC  ? fetchSavantLeaderboard(type, 'statcast',            season) : Promise.resolve(null),
+            needsExp ? fetchSavantLeaderboard(type, 'expected_statistics', season) : Promise.resolve(null),
+          ]);
+          currentData = applySavantRows(currentData, { statcast: scRows, expected: expRows }, isTeam, '', skipKeys);
+        }
+      }
+    } catch (savantErr) {
+      console.warn('Baseball Savant enrichment failed — using FanGraphs data:', savantErr.message);
+    }
+
     currentXKey = selX.value;
     currentYKey = selY.value;
     chartStatus.style.display = 'none';
