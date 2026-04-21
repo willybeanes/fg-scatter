@@ -1586,7 +1586,13 @@ function baseKey(key) {
   return key.replace(/^(hit_|pit_)/, '');
 }
 
+// Counting stats where a null API response means 0, not "no data"
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS']);
+
 function displayVal(val, key) {
+  // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
+  // Treat that as 0 so players aren't incorrectly excluded from the chart.
+  if (val == null) return COUNTING_KEYS.has(baseKey(key)) ? 0 : val;
   return PCT_KEYS.has(baseKey(key)) ? val * 100 : val;
 }
 
@@ -1603,7 +1609,7 @@ function formatStat(v, key) {
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
-  if (['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS'].includes(bk)) return Math.round(v);
+  if (COUNTING_KEYS.has(bk)) return Math.round(v);
   if (key === 'total_WAR') return v.toFixed(1);
   return Number.isInteger(v) ? v : v.toFixed(2);
 }
