@@ -547,6 +547,67 @@ function getSavantDateRange(month, season) {
   }
 }
 
+// Convert a FanGraphs split code to the correct FanGraphs API params.
+// Several month codes are broken or return wrong data mid-season in FG's API.
+// For those, use month=1000 + explicit startdate/enddate instead.
+function getFGSplitParams(splitValue, season) {
+  const yr = String(season || new Date().getFullYear());
+  const fmt = d => d.toISOString().slice(0, 10);
+  const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return fmt(d); };
+  const today = fmt(new Date());
+  switch (String(splitValue)) {
+    case '0':  return { month: '1' };                                                       // Full Season — month=0 silently drops some players; month=1 is correct
+    case '31': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-05-01` }; // Mar/Apr
+    case '32': return { month: '1000', startdate: daysAgo(7),   enddate: today };           // Last 7 days
+    case '33': return { month: '1000', startdate: daysAgo(14),  enddate: today };           // Last 14 days
+    case '34': return { month: '1000', startdate: daysAgo(30),  enddate: today };           // Last 30 days
+    case '35': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-07-12` }; // First Half
+    case '36': return { month: '1000', startdate: `${yr}-07-12`, enddate: `${yr}-11-01` }; // Second Half
+    default:   return { month: splitValue };
+  }
+}
+
+// Disable split options that haven't started yet for the currently selected season.
+// FanGraphs silently returns full-season or empty data for future periods, so we
+// prevent selecting them in the first place.
+function updateSplitAvailability() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1 = Jan … 12 = Dec
+  const selectedSeason = parseInt(selSeason.value);
+
+  // For past seasons everything is available; future seasons keep Full Season only.
+  const isPast   = selectedSeason < currentYear;
+  const isFuture = selectedSeason > currentYear;
+
+  // Calendar month when each split period *starts* (used only for current-year checks)
+  const STARTS_MONTH = {
+    '2':  5,  // May
+    '3':  6,  // June
+    '4':  7,  // July
+    '5':  8,  // August
+    '6':  9,  // Sept/Oct
+    '36': 7,  // Second Half (~July 12)
+  };
+
+  for (const opt of selSplit.options) {
+    if (opt.value === '0') { opt.disabled = false; opt.title = ''; continue; } // Full Season always on
+    if (isPast)   { opt.disabled = false; opt.title = ''; continue; }
+    if (isFuture) { opt.disabled = opt.value !== '0'; opt.title = opt.disabled ? 'No data yet' : ''; continue; }
+
+    // Current season: disable months that start after today
+    const startsMonth = STARTS_MONTH[opt.value];
+    const tooEarly = startsMonth && currentMonth < startsMonth;
+    opt.disabled = !!tooEarly;
+    opt.title = tooEarly ? "This period hasn't started yet" : '';
+  }
+
+  // If the currently selected option got disabled, fall back to Full Season
+  if (selSplit.options[selSplit.selectedIndex]?.disabled) {
+    selSplit.value = '0';
+  }
+}
+
 // Fetch a Baseball Savant leaderboard CSV (full season)
 async function fetchSavantLeaderboard(type, endpoint, season) {
   const params = new URLSearchParams({ path: `/leaderboard/${endpoint}`, type, year: season, min: '0', csv: 'true' });
@@ -977,6 +1038,7 @@ function switchMode(mode) {
 // Init
 (function init() {
   selSeason.value = new Date().getFullYear();
+  selSeason.addEventListener('change', updateSplitAvailability);
   populateAxisDropdowns();
   selX.value = 'SwStr%';
   selY.value = 'ERA';
@@ -1025,6 +1087,7 @@ function switchMode(mode) {
   }
   if (urlP.has('x')) selX.value = urlP.get('x');
   if (urlP.has('y')) selY.value = urlP.get('y');
+  updateSplitAvailability();
   if (urlP.has('season') || urlP.has('x') || urlP.has('y')) generate();
 
   // Zoom drag — mousedown on plot background starts a selection box
@@ -1119,7 +1182,7 @@ async function generate() {
   try {
     if (isCombined) {
       // Fetch team-level batting and pitching data in parallel using team=0,ts
-      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, month: selSplit.value, ind: '0', hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
+      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, ...getFGSplitParams(selSplit.value, season), ind: '0', hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
       const [batResp, pitResp] = await Promise.all([
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'bat' })}`),
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'pit' })}`)
@@ -1161,7 +1224,7 @@ async function generate() {
         qual: '0',
         type: '4',
         season, season1: season,
-        month: selSplit.value, ind: '0',
+        ...getFGSplitParams(selSplit.value, season), ind: '0',
         hand: selHand.value,
         team: teamParam,
         pageitems: '10000', pagenum: '1',
@@ -1181,16 +1244,29 @@ async function generate() {
         PlayerName: t.TeamName || t.TeamNameAbb,
       }));
     } else {
+      // For rolling-window splits (last 7/14/30 days), qual=anything > 0 will
+      // return 0 results because no player accumulates enough IP/PA in days.
+      const isRollingWindow = ['32', '33', '34'].includes(selSplit.value);
+      const effectiveQual = isRollingWindow ? '0' : selQual.value;
+
+      // When using month=1000 (custom date range), FanGraphs' team filter is
+      // unreliable — it silently drops players.  Always fetch team=0 for these
+      // splits and apply the team filter client-side instead.
+      const fgSplitParams = getFGSplitParams(selSplit.value, season);
+      const usesCustomRange = fgSplitParams.month === '1000';
+      const wantTeam = selTeam.value !== '0';
+      const apiTeam = (usesCustomRange && wantTeam) ? '0' : selTeam.value;
+
       const params = new URLSearchParams({
         pos: isHitting ? selStats.value : 'all',
         stats: isHitting ? 'bat' : selStats.value,
         lg: selLg.value,
-        qual: selQual.value,
+        qual: effectiveQual,
         type: '4',
         season, season1: season,
-        month: selSplit.value, ind: '0',
+        ...fgSplitParams, ind: '0',
         hand: selHand.value,
-        team: selTeam.value,
+        team: apiTeam,
         pageitems: '10000', pagenum: '1',
         sortstat: 'WAR', sortdir: 'default'
       });
@@ -1198,8 +1274,15 @@ async function generate() {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
       if (json.error) throw new Error(json.error);
-      const players = json.data;
+      let players = json.data;
       if (!players || !players.length) throw new Error('No data returned');
+
+      // Client-side team filter (only needed when we bypassed the API filter above)
+      if (usesCustomRange && wantTeam) {
+        const teamAbbr = selTeam.options[selTeam.selectedIndex].textContent.trim();
+        players = players.filter(p => p.TeamNameAbb === teamAbbr || p.Team === teamAbbr);
+        if (!players.length) throw new Error('No data returned');
+      }
 
       currentGroupBy = 'player';
       currentData = players;
