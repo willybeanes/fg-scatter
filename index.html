@@ -697,7 +697,7 @@ const STAT_GROUPS_PITCHING = [
   { group: 'Counting', stats: [
     { key: 'W', label: 'W' }, { key: 'L', label: 'L' }, { key: 'G', label: 'G' },
     { key: 'GS', label: 'GS' }, { key: 'CG', label: 'CG' }, { key: 'ShO', label: 'ShO' },
-    { key: 'SV', label: 'SV' }, { key: 'HLD', label: 'HLD' }, { key: 'BS', label: 'BS' },
+    { key: 'SV', label: 'SV' }, { key: 'HLD', label: 'HLD' }, { key: 'SV+HLD', label: 'SV+HLD' }, { key: 'BS', label: 'BS' },
     { key: 'IP', label: 'IP' }, { key: 'TBF', label: 'TBF' }, { key: 'H', label: 'H' },
     { key: 'R', label: 'R' }, { key: 'ER', label: 'ER' }, { key: 'HR', label: 'HR' },
     { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' }, { key: 'HBP', label: 'HBP' },
@@ -1288,6 +1288,11 @@ async function generate() {
       currentData = players;
     }
 
+    // Compute composite stats
+    for (const p of currentData) {
+      p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
+    }
+
     // Enrich with fresh Baseball Savant data for statcast/xstat metrics
     const xBk = baseKey(selX.value), yBk = baseKey(selY.value);
     try {
@@ -1597,7 +1602,7 @@ function formatStat(v, key) {
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
-  if (['W','L','G','GS','CG','ShO','SV','HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS'].includes(bk)) return Math.round(v);
+  if (['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS'].includes(bk)) return Math.round(v);
   if (key === 'total_WAR') return v.toFixed(1);
   return Number.isInteger(v) ? v : v.toFixed(2);
 }
