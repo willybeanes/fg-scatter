@@ -557,7 +557,6 @@ function getFGSplitParams(splitValue, season) {
   const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return fmt(d); };
   const today = fmt(new Date());
   switch (String(splitValue)) {
-    case '0':  return { month: '1' };                                                       // Full Season — month=0 silently drops some players; month=1 is correct
     case '31': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-05-01` }; // Mar/Apr
     case '32': return { month: '1000', startdate: daysAgo(7),   enddate: today };           // Last 7 days
     case '33': return { month: '1000', startdate: daysAgo(14),  enddate: today };           // Last 14 days
