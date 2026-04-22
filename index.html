@@ -1245,12 +1245,7 @@ async function generate() {
         PlayerName: t.TeamName || t.TeamNameAbb,
       }));
     } else {
-      // For rolling-window splits, numeric qualifiers (e.g. qual=5 IP) are too
-      // strict and return 0 results, so we force qual=0.  But qual=y (FanGraphs'
-      // standard qualifier) is left alone — FanGraphs scales it proportionally
-      // to the date range (~16 PA / ~6 IP per 7 days, etc.).
-      const isRollingWindow = ['32', '33', '34'].includes(selSplit.value);
-      const effectiveQual = (isRollingWindow && selQual.value !== 'y') ? '0' : selQual.value;
+      const effectiveQual = selQual.value;
 
       // When using month=1000 (custom date range), FanGraphs' team filter is
       // unreliable — it silently drops players.  Always fetch team=0 for these
