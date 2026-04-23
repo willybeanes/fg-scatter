@@ -773,9 +773,8 @@ const STAT_GROUPS_HITTING = [
     { key: 'H', label: 'H' }, { key: '1B', label: '1B' }, { key: '2B', label: '2B' },
     { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' }, { key: 'R', label: 'R' },
     { key: 'RBI', label: 'RBI' }, { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' },
-    { key: 'SO', label: 'SO' }, { key: 'HBP', label: 'HBP' }, { key: 'SF', label: 'SF' },
-    { key: 'SH', label: 'SH' }, { key: 'GDP', label: 'GDP' }, { key: 'SB', label: 'SB' },
-    { key: 'CS', label: 'CS' },
+    { key: 'SO', label: 'SO' }, { key: 'HBP', label: 'HBP' }, { key: 'TOB', label: 'TOB' },
+    { key: 'SF', label: 'SF' }, { key: 'SH', label: 'SH' }, { key: 'GDP', label: 'GDP' },
   ]},
   { group: 'Rate', stats: [
     { key: 'BB%', label: 'BB%' }, { key: 'K%', label: 'K%' }, { key: 'BB/K', label: 'BB/K' },
@@ -869,7 +868,7 @@ const COUNTING_STATS = new Set([
   'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
   'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
   // Batting counting stats
-  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS',
+  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB',
 ]);
 
 function aggregateByTeam(players) {
@@ -1290,6 +1289,7 @@ async function generate() {
     for (const p of currentData) {
       p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
+      p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
     }
 
     // Enrich with fresh Baseball Savant data for statcast/xstat metrics
@@ -1585,7 +1585,7 @@ function baseKey(key) {
 }
 
 // Counting stats where a null API response means 0, not "no data"
-const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS']);
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB']);
 
 function displayVal(val, key) {
   // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
