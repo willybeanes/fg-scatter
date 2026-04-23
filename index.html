@@ -801,7 +801,7 @@ const STAT_GROUPS_HITTING = [
     { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
   ]},
   { group: 'Baserunning', stats: [
-    { key: 'SB', label: 'SB' }, { key: 'CS', label: 'CS' },
+    { key: 'SB', label: 'SB' }, { key: 'CS', label: 'CS' }, { key: 'SB+CS', label: 'SB+CS' },
     { key: 'BaseRunning', label: 'BsR' }, { key: 'Spd', label: 'Spd' },
   ]},
   { group: 'Batted Ball Quality', stats: [
@@ -869,7 +869,7 @@ const COUNTING_STATS = new Set([
   'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
   'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
   // Batting counting stats
-  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS',
+  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS',
 ]);
 
 function aggregateByTeam(players) {
@@ -1289,6 +1289,7 @@ async function generate() {
     // Compute composite stats
     for (const p of currentData) {
       p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
+      p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
     }
 
     // Enrich with fresh Baseball Savant data for statcast/xstat metrics
@@ -1584,7 +1585,7 @@ function baseKey(key) {
 }
 
 // Counting stats where a null API response means 0, not "no data"
-const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS']);
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS']);
 
 function displayVal(val, key) {
   // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
