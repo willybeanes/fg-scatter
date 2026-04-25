@@ -730,7 +730,7 @@ const STAT_GROUPS_PITCHING = [
     { key: 'Z-Contact%', label: 'Z-Contact%' }, { key: 'Contact%', label: 'Contact%' },
     { key: 'Zone%', label: 'Zone%' }, { key: 'F-Strike%', label: 'F-Strike%' },
     { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
-    { key: 'CSW%', label: 'CSW%' },
+    { key: 'C+SwStr%', label: 'CSW%' },
   ]},
   { group: 'Workload', stats: [
     { key: 'Starting', label: 'Starting' }, { key: 'Start-IP', label: 'Start-IP' },
@@ -1647,7 +1647,7 @@ function rerenderLayout() {
 const PCT_KEYS = new Set([
   'K%','BB%','K-BB%','BABIP','LOB%','GB%','FB%','HR/FB','SwStr%','IFFB%','LD%',
   'O-Swing%','Z-Swing%','Swing%','O-Contact%','Z-Contact%','Contact%','Zone%','F-Strike%',
-  'CStr%','CSW%','IFH%','BUH%','TTO%',
+  'CStr%','C+SwStr%','IFH%','BUH%','TTO%',
   'pfxFA%','pfxFT%','pfxFC%','pfxFS%','pfxFO%','pfxSI%','pfxSL%','pfxCU%',
   'pfxKC%','pfxEP%','pfxCH%','pfxSC%','pfxKN%','pfxUN%',
   // Batting-specific percentages
