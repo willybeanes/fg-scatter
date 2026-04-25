@@ -1320,15 +1320,39 @@ async function generate() {
         if (prevResp.ok) {
           const prevJson = await prevResp.json();
           if (!prevJson.error && prevJson.data?.length) {
+            let prevPlayers = prevJson.data;
+
             // Compute composites on prev year data so they work as X axes
-            for (const p of prevJson.data) {
+            for (const p of prevPlayers) {
               p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
             }
+
+            // If X is a Savant stat, enrich prev year players with Savant leaderboard data
+            const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
+            const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
+            if (savantDetail) {
+              try {
+                const lbType = isHitting ? 'batter' : 'pitcher';
+                const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
+                const [scRows, expRows] = await Promise.all([
+                  savantDetail.leaderEp === 'statcast'
+                    ? fetchSavantLeaderboard(lbType, 'statcast', prevSeason)
+                    : Promise.resolve(null),
+                  savantDetail.leaderEp === 'expected_statistics'
+                    ? fetchSavantLeaderboard(lbType, 'expected_statistics', prevSeason)
+                    : Promise.resolve(null),
+                ]);
+                prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, false, '', skipKeys, false);
+              } catch (savantPrevErr) {
+                console.warn('Prev year Savant fetch failed:', savantPrevErr.message);
+              }
+            }
+
             const xKeyRaw = selX.value;
             const prevMap = {};
-            for (const p of prevJson.data) {
+            for (const p of prevPlayers) {
               if (p.playerid != null) prevMap[p.playerid] = p[xKeyRaw] ?? null;
             }
             for (const p of currentData) {
