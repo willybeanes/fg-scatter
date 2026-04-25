@@ -917,6 +917,7 @@ let currentData = null;
 let currentXKey = null;
 let currentYKey = null;
 let currentGroupBy = 'player';
+let currentPrevYearSeason = null;
 let hiddenKeys = new Set(); // tracks dismissed players/teams
 let currentMode = 'pitching'; // 'pitching' or 'hitting'
 let zoomState = null;    // { xMin, xMax, yMin, yMax } in display coords, or null
@@ -974,6 +975,11 @@ function populateAxisDropdowns() {
       sel.appendChild(og);
     });
   }
+  // "Prev Year" is only meaningful on the Y axis
+  const prevOg = document.createElement('optgroup');
+  prevOg.label = 'Compare';
+  prevOg.appendChild(new Option('Prev Year (Same Stat)', '__prev_year__'));
+  selY.appendChild(prevOg);
 }
 
 function switchMode(mode) {
@@ -1152,6 +1158,7 @@ async function generate() {
   const isCombined = currentMode === 'combined';
   const isTeam = isCombined || selGroup.value === 'team';
   const isHitting = currentMode === 'hitting';
+  currentPrevYearSeason = null; // reset each run
 
   // Update URL with current state
   const urlState = new URLSearchParams({ mode: currentMode, season, split: selSplit.value });
@@ -1292,6 +1299,49 @@ async function generate() {
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
     }
 
+    // Fetch previous season data when Y = "Prev Year (Same Stat)"
+    if (selY.value === '__prev_year__' && !isCombined && !isTeam) {
+      const prevSeason = String(parseInt(season) - 1);
+      const prevQual = isHitting ? '200' : '50';
+      const prevParams = new URLSearchParams({
+        pos: 'all',
+        stats: isHitting ? 'bat' : selStats.value,
+        lg: 'all',
+        qual: prevQual,
+        type: '4',
+        season: prevSeason, season1: prevSeason,
+        month: '0', ind: '0',
+        hand: '', team: '0',
+        pageitems: '10000', pagenum: '1',
+        sortstat: 'WAR', sortdir: 'default'
+      });
+      try {
+        const prevResp = await fetch(`${PROXY}?${prevParams}`);
+        if (prevResp.ok) {
+          const prevJson = await prevResp.json();
+          if (!prevJson.error && prevJson.data?.length) {
+            // Compute composites on prev year data so they work as X axes
+            for (const p of prevJson.data) {
+              p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
+              p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
+              p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
+            }
+            const xKeyRaw = selX.value;
+            const prevMap = {};
+            for (const p of prevJson.data) {
+              if (p.playerid != null) prevMap[p.playerid] = p[xKeyRaw] ?? null;
+            }
+            for (const p of currentData) {
+              p['__prev_year__'] = prevMap[p.playerid] ?? null;
+            }
+            currentPrevYearSeason = parseInt(prevSeason);
+          }
+        }
+      } catch (prevErr) {
+        console.warn('Prev year fetch failed:', prevErr.message);
+      }
+    }
+
     // Enrich with fresh Baseball Savant data for statcast/xstat metrics
     const xBk = baseKey(selX.value), yBk = baseKey(selY.value);
     try {
@@ -1392,7 +1442,9 @@ function rerenderLayout() {
 
   // Axis labels
   const xLabel = STAT_OPTIONS.find(s => s.key === xKey)?.label || xKey;
-  const yLabel = STAT_OPTIONS.find(s => s.key === yKey)?.label || yKey;
+  const yLabel = yKey === '__prev_year__'
+    ? `${currentPrevYearSeason ?? parseInt(selSeason.value) - 1} ${xLabel}`
+    : (STAT_OPTIONS.find(s => s.key === yKey)?.label || yKey);
   axisLabelX.textContent = xLabel;
   axisLabelY.textContent = yLabel;
 
@@ -1579,8 +1631,10 @@ const PCT_KEYS = new Set([
   'Barrel%','HardHit%',
 ]);
 
-// Strip hit_/pit_ prefix for format lookups
+// Strip hit_/pit_ prefix for format lookups.
+// __prev_year__ delegates to currentXKey so all formatting/pct logic works transparently.
 function baseKey(key) {
+  if (key === '__prev_year__') return currentXKey ? baseKey(currentXKey) : key;
   return key.replace(/^(hit_|pit_)/, '');
 }
 
