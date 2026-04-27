@@ -698,7 +698,7 @@ const STAT_GROUPS_PITCHING = [
   { group: 'Counting', stats: [
     { key: 'W', label: 'W' }, { key: 'L', label: 'L' }, { key: 'G', label: 'G' },
     { key: 'GS', label: 'GS' }, { key: 'CG', label: 'CG' }, { key: 'ShO', label: 'ShO' },
-    { key: 'SV', label: 'SV' }, { key: 'HLD', label: 'HLD' }, { key: 'SV+HLD', label: 'SV+HLD' }, { key: 'BS', label: 'BS' },
+    { key: 'SV', label: 'SV' }, { key: 'HLD', label: 'HLD' }, { key: 'SV+HLD', label: 'SV+HLD' }, { key: 'SV+HLD+W', label: 'SV+HLD+W' }, { key: 'BS', label: 'BS' },
     { key: 'IP', label: 'IP' }, { key: 'TBF', label: 'TBF' }, { key: 'H', label: 'H' },
     { key: 'R', label: 'R' }, { key: 'ER', label: 'ER' }, { key: 'HR', label: 'HR' },
     { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' }, { key: 'HBP', label: 'HBP' },
@@ -863,7 +863,7 @@ function teamLogoUrl(fgAbbr) {
 
 // Stat aggregation: rate stats are IP-weighted averages, counting stats are sums
 const COUNTING_STATS = new Set([
-  'W','L','G','GS','CG','ShO','SV','HLD','BS','IP','TBF','H','R','ER','HR',
+  'W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','IP','TBF','H','R','ER','HR',
   'BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls',
   'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
   'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
@@ -1295,6 +1295,7 @@ async function generate() {
     // Compute composite stats
     for (const p of currentData) {
       p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
+      p['SV+HLD+W'] = (p.SV || 0) + (p.HLD || 0) + (p.W || 0);
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
     }
@@ -1325,6 +1326,7 @@ async function generate() {
             // Compute composites on prev year data so they work as X axes
             for (const p of prevPlayers) {
               p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
+              p['SV+HLD+W'] = (p.SV || 0) + (p.HLD || 0) + (p.W || 0);
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
             }
@@ -1663,7 +1665,7 @@ function baseKey(key) {
 }
 
 // Counting stats where a null API response means 0, not "no data"
-const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB']);
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB']);
 
 function displayVal(val, key) {
   // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
