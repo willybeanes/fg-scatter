@@ -1787,10 +1787,8 @@ function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
     if (currentMode === 'combined') {
       ttMeta.textContent = `${player._hitterCount || 0} hitters  |  ${player._pitcherCount || 0} pitchers`;
     } else {
-      const count = player._pitcherCount || player._hitterCount || 0;
-      const label = isHit ? 'hitters' : 'pitchers';
       const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
-      ttMeta.textContent = `${count} ${label}  |  ${vol}`;
+      ttMeta.textContent = vol;
     }
   } else {
     const hand = isHit ? (player.Bats || '') : (player.Throws || '');
