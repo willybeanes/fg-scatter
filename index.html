@@ -1399,10 +1399,11 @@ async function generate() {
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
                 if (savantDetail.leaderEp === 'bat_tracking') {
                   // Bat tracking leaderboard ignores year params — use statcast_search instead.
-                  // Only supported for stats that have a searchCol; team mode not supported.
-                  if (savantDetail.searchCol && !isTeam) {
-                    const srchRows = await fetchSavantSearch('batter', 'name', prevSeason, null);
-                    prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, false, '', skipKeys, true);
+                  // statcast_search supports both group_by=name (players) and group_by=team.
+                  if (savantDetail.searchCol) {
+                    const srchGroup = isTeam ? 'team' : 'name';
+                    const srchRows = await fetchSavantSearch('batter', srchGroup, prevSeason, null);
+                    prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, isTeam, '', skipKeys, true);
                   }
                 } else {
                   const [scRows, expRows] = await Promise.all([
@@ -1452,7 +1453,8 @@ async function generate() {
       const needsAnySavant = [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]);
       // Bat tracking stats that have a searchCol — need statcast_search even in full-season mode
       // (search-only stats like AttackAngle have no leaderboard column; BatSpeed/SwingLen prefer search in date-range mode)
-      const needsBtSearch = isHitting && !isTeam && [xBk, yBk].some(k => {
+      // Team mode is fine: statcast_search with group_by=team supports bat tracking aggregation
+      const needsBtSearch = isHitting && [xBk, yBk].some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
         return d?.leaderEp === 'bat_tracking' && !!d.searchCol;
       });
