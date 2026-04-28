@@ -480,6 +480,15 @@ const SAVANT_FIELD_DETAIL = {
   'xwOBA':    { leaderEp: 'expected_statistics', leaderCol: 'est_woba',                searchCol: 'xwoba',                   div: 1   },
   'xSLG':     { leaderEp: 'expected_statistics', leaderCol: 'est_slg',                 searchCol: 'xslg',                    div: 1   },
   'xERA':     { leaderEp: 'expected_statistics', leaderCol: 'xera',                    searchCol: null,                      div: 1   },
+  // Bat tracking — leaderboard only (no date-range split support)
+  'BatSpeed':   { leaderEp: 'bat_tracking', leaderCol: 'avg_bat_speed',              searchCol: null, div: 1 },
+  'FastSwing%': { leaderEp: 'bat_tracking', leaderCol: 'hard_swing_rate',            searchCol: null, div: 1 },
+  'Blasts/C':   { leaderEp: 'bat_tracking', leaderCol: 'blast_per_bat_contact',      searchCol: null, div: 1 },
+  'Blasts/Sw':  { leaderEp: 'bat_tracking', leaderCol: 'blast_per_swing',            searchCol: null, div: 1 },
+  'SqUp/C':     { leaderEp: 'bat_tracking', leaderCol: 'squared_up_per_bat_contact', searchCol: null, div: 1 },
+  'SqUp/Sw':    { leaderEp: 'bat_tracking', leaderCol: 'squared_up_per_swing',       searchCol: null, div: 1 },
+  'SwingLen':   { leaderEp: 'bat_tracking', leaderCol: 'swing_length',               searchCol: null, div: 1 },
+  'Swords':     { leaderEp: 'bat_tracking', leaderCol: 'swords',                     searchCol: null, div: 1 },
 };
 const SAVANT_KEYS = new Set(Object.keys(SAVANT_FIELD_DETAIL));
 
@@ -640,14 +649,28 @@ async function fetchSavantSearch(playerType, groupBy, season, dateRange) {
   return parseCSV(text);
 }
 
+// Fetch Baseball Savant bat-tracking leaderboard CSV (full season only — no date-range splits)
+async function fetchSavantBatTracking(season) {
+  const params = new URLSearchParams({
+    path: '/leaderboard/bat-tracking',
+    attackZone: '', batSide: '', contactType: '',
+    seasons: season, team: '', csv: 'true'
+  });
+  const resp = await fetch(`${SAVANT_PROXY}?${params}`);
+  if (!resp.ok) throw new Error(`Savant bat tracking HTTP ${resp.status}`);
+  const text = await resp.text();
+  if (text.trim().startsWith('<')) throw new Error('Savant bat tracking returned HTML');
+  return parseCSV(text);
+}
+
 // Merge savant data into FG rows.
-// data: { search, statcast, expected } — each is a parsed CSV array or null
+// data: { search, statcast, expected, batTracking } — each is a parsed CSV array or null
 // isTeam: true = team-level matching
 // prefix: '' for player/team mode; 'hit_' or 'pit_' for combined mode
 // skipFgKeys: skip certain keys (e.g. skip xERA for hitting side)
 // useSearch: true = use statcast_search data (date range); false = use leaderboard data
 function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set(), useSearch = false) {
-  if (!data.search && !data.statcast && !data.expected) return rows;
+  if (!data.search && !data.statcast && !data.expected && !data.batTracking) return rows;
 
   // Build lookup maps
   // Leaderboard: keyed by team_id (abbr) for teams, player_id for players
@@ -656,6 +679,8 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
   const expMap = Object.fromEntries((data.expected  || []).filter(r => r[lbKey]).map(r => [r[lbKey],  r]));
   // Search: keyed by player_id (MLBAM player or team ID)
   const srchMap = Object.fromEntries((data.search || []).filter(r => r.player_id).map(r => [r.player_id, r]));
+  // Bat tracking: keyed by 'id' (MLBAM player ID, player-only — no team aggregation)
+  const btMap = Object.fromEntries((data.batTracking || []).filter(r => r.id).map(r => [r.id, r]));
 
   return rows.map(p => {
     // Determine match keys for each source type
@@ -668,12 +693,15 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
     const srchRow = srchMap[srchMatchId] || {};
     const scRow   = scMap[lbMatchId]     || {};
     const expRow  = expMap[lbMatchId]    || {};
+    const btRow   = btMap[playerMlbamId] || {};
     const merged  = { ...p };
 
     for (const [fgKey, detail] of Object.entries(SAVANT_FIELD_DETAIL)) {
       if (skipFgKeys.has(fgKey)) continue;
       let raw;
-      if (useSearch && detail.searchCol) {
+      if (detail.leaderEp === 'bat_tracking') {
+        raw = btRow[detail.leaderCol];
+      } else if (useSearch && detail.searchCol) {
         // Date-range query: pull from statcast_search
         raw = srchRow[detail.searchCol];
       } else {
@@ -808,6 +836,16 @@ const STAT_GROUPS_HITTING = [
     { key: 'Barrel%', label: 'Barrel%' }, { key: 'HardHit%', label: 'HardHit%' },
     { key: 'maxEV', label: 'maxEV' },
   ]},
+  { group: 'Bat Tracking', stats: [
+    { key: 'BatSpeed',   label: 'Bat Speed'  },
+    { key: 'FastSwing%', label: 'Fast Swing%' },
+    { key: 'Blasts/C',  label: 'Blasts/C'   },
+    { key: 'Blasts/Sw', label: 'Blasts/Sw'  },
+    { key: 'SqUp/C',    label: 'Sq-Up/C'    },
+    { key: 'SqUp/Sw',   label: 'Sq-Up/Sw'   },
+    { key: 'SwingLen',  label: 'Swing Len'  },
+    { key: 'Swords',    label: 'Swords'     },
+  ]},
   { group: 'Plus Stats', stats: [
     { key: 'AVG+', label: 'AVG+' }, { key: 'BB%+', label: 'BB%+' }, { key: 'K%+', label: 'K%+' },
     { key: 'OBP+', label: 'OBP+' }, { key: 'SLG+', label: 'SLG+' },
@@ -868,7 +906,7 @@ const COUNTING_STATS = new Set([
   'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
   'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
   // Batting counting stats
-  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB',
+  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords',
 ]);
 
 function aggregateByTeam(players) {
@@ -1338,15 +1376,17 @@ async function generate() {
               try {
                 const lbType = isHitting ? 'batter' : 'pitcher';
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
-                const [scRows, expRows] = await Promise.all([
-                  savantDetail.leaderEp === 'statcast'
+                const isBatTracking = savantDetail.leaderEp === 'bat_tracking';
+                const [scRows, expRows, btRows] = await Promise.all([
+                  (!isBatTracking && savantDetail.leaderEp === 'statcast')
                     ? fetchSavantLeaderboard(lbType, 'statcast', prevSeason)
                     : Promise.resolve(null),
-                  savantDetail.leaderEp === 'expected_statistics'
+                  (!isBatTracking && savantDetail.leaderEp === 'expected_statistics')
                     ? fetchSavantLeaderboard(lbType, 'expected_statistics', prevSeason)
                     : Promise.resolve(null),
+                  isBatTracking ? fetchSavantBatTracking(prevSeason) : Promise.resolve(null),
                 ]);
-                prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, false, '', skipKeys, false);
+                prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows, batTracking: btRows }, false, '', skipKeys, false);
               } catch (savantPrevErr) {
                 console.warn('Prev year Savant fetch failed:', savantPrevErr.message);
               }
@@ -1381,8 +1421,10 @@ async function generate() {
       const needsAnySavant = [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]);
       // Does either axis need statcast_search (has a searchCol)?
       const needsSearch = useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]?.searchCol);
-      // Do we still need leaderboard even in search mode? (for stats with no searchCol: xERA, maxEV, HardHit)
-      const needsLbEvenWithSearch = useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol);
+      // Do we still need leaderboard even in search mode? (for stats with no searchCol: xERA, maxEV, HardHit — excluding bat_tracking which has its own fetch)
+      const needsLbEvenWithSearch = useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking');
+      // Bat tracking: hitters only, always full-season leaderboard (no date-range split support)
+      const needsBatTracking = isHitting && !isTeam && needsLbEp('bat_tracking');
 
       if (isCombined) {
         // Combined: hit_ and pit_ sides use leaderboard
@@ -1407,7 +1449,7 @@ async function generate() {
         const srchGroup  = isTeam ? 'team' : 'name';
         const skipKeys   = isHitting ? new Set(['xERA']) : new Set(['xwOBA','xSLG']);
 
-        const [srchRows, scRows, expRows] = await Promise.all([
+        const [srchRows, scRows, expRows, btRows] = await Promise.all([
           // statcast_search: one call covers all searchCol stats for any date range
           needsSearch ? fetchSavantSearch(playerType, srchGroup, season, dateRange) : Promise.resolve(null),
           // Leaderboard statcast: full season, or fallback for stats with no searchCol
@@ -1416,8 +1458,10 @@ async function generate() {
           // Leaderboard expected_statistics: full season, or fallback for xERA (no searchCol)
           (!useSearch && needsLbEp('expected_statistics')) || (needsLbEvenWithSearch && needsLbEp('expected_statistics'))
             ? fetchSavantLeaderboard(lbType, 'expected_statistics', season) : Promise.resolve(null),
+          // Bat tracking leaderboard: hitters only, always full-season
+          needsBatTracking ? fetchSavantBatTracking(season) : Promise.resolve(null),
         ]);
-        currentData = applySavantRows(currentData, { search: srchRows, statcast: scRows, expected: expRows }, isTeam, '', skipKeys, useSearch);
+        currentData = applySavantRows(currentData, { search: srchRows, statcast: scRows, expected: expRows, batTracking: btRows }, isTeam, '', skipKeys, useSearch);
       }
     } catch (savantErr) {
       console.warn('Baseball Savant enrichment failed — using FanGraphs data:', savantErr.message);
@@ -1655,6 +1699,8 @@ const PCT_KEYS = new Set([
   // Batting-specific percentages
   'Pull%','Cent%','Oppo%','Soft%','Med%','Hard%',
   'Barrel%','HardHit%',
+  // Bat tracking rates (stored as fractions 0–1)
+  'FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw',
 ]);
 
 // Strip hit_/pit_ prefix for format lookups.
@@ -1665,7 +1711,7 @@ function baseKey(key) {
 }
 
 // Counting stats where a null API response means 0, not "no data"
-const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB']);
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords']);
 
 function displayVal(val, key) {
   // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
@@ -1683,7 +1729,7 @@ function formatStat(v, key) {
   if (SLASH_KEYS.has(bk)) return v.toFixed(3);
   if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC'].includes(bk)) return v.toFixed(1);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC','BatSpeed','SwingLen'].includes(bk)) return v.toFixed(1);
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
