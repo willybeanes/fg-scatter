@@ -1369,24 +1369,24 @@ async function generate() {
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
             }
 
-            // If X is a Savant stat, enrich prev year players with Savant leaderboard data
+            // If X is a Savant stat, enrich prev year players with Savant leaderboard data.
+            // Bat tracking is excluded: its endpoint doesn't support year filtering,
+            // so both seasons would return identical data — useless and misleading.
             const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
             const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
-            if (savantDetail) {
+            if (savantDetail && savantDetail.leaderEp !== 'bat_tracking') {
               try {
                 const lbType = isHitting ? 'batter' : 'pitcher';
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
-                const isBatTracking = savantDetail.leaderEp === 'bat_tracking';
-                const [scRows, expRows, btRows] = await Promise.all([
-                  (!isBatTracking && savantDetail.leaderEp === 'statcast')
+                const [scRows, expRows] = await Promise.all([
+                  savantDetail.leaderEp === 'statcast'
                     ? fetchSavantLeaderboard(lbType, 'statcast', prevSeason)
                     : Promise.resolve(null),
-                  (!isBatTracking && savantDetail.leaderEp === 'expected_statistics')
+                  savantDetail.leaderEp === 'expected_statistics'
                     ? fetchSavantLeaderboard(lbType, 'expected_statistics', prevSeason)
                     : Promise.resolve(null),
-                  isBatTracking ? fetchSavantBatTracking(prevSeason) : Promise.resolve(null),
                 ]);
-                prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows, batTracking: btRows }, false, '', skipKeys, false);
+                prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, false, '', skipKeys, false);
               } catch (savantPrevErr) {
                 console.warn('Prev year Savant fetch failed:', savantPrevErr.message);
               }
