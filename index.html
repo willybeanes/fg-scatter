@@ -481,14 +481,18 @@ const SAVANT_FIELD_DETAIL = {
   'xSLG':     { leaderEp: 'expected_statistics', leaderCol: 'est_slg',                 searchCol: 'xslg',                    div: 1   },
   'xERA':     { leaderEp: 'expected_statistics', leaderCol: 'xera',                    searchCol: null,                      div: 1   },
   // Bat tracking — leaderboard only (no date-range split support)
-  'BatSpeed':   { leaderEp: 'bat_tracking', leaderCol: 'avg_bat_speed',              searchCol: null, div: 1 },
-  'FastSwing%': { leaderEp: 'bat_tracking', leaderCol: 'hard_swing_rate',            searchCol: null, div: 1 },
-  'Blasts/C':   { leaderEp: 'bat_tracking', leaderCol: 'blast_per_bat_contact',      searchCol: null, div: 1 },
-  'Blasts/Sw':  { leaderEp: 'bat_tracking', leaderCol: 'blast_per_swing',            searchCol: null, div: 1 },
-  'SqUp/C':     { leaderEp: 'bat_tracking', leaderCol: 'squared_up_per_bat_contact', searchCol: null, div: 1 },
-  'SqUp/Sw':    { leaderEp: 'bat_tracking', leaderCol: 'squared_up_per_swing',       searchCol: null, div: 1 },
-  'SwingLen':   { leaderEp: 'bat_tracking', leaderCol: 'swing_length',               searchCol: null, div: 1 },
-  'Swords':     { leaderEp: 'bat_tracking', leaderCol: 'swords',                     searchCol: null, div: 1 },
+  'BatSpeed':     { leaderEp: 'bat_tracking', leaderCol: 'avg_bat_speed',              searchCol: 'bat_speed',          div: 1 },
+  'FastSwing%':   { leaderEp: 'bat_tracking', leaderCol: 'hard_swing_rate',            searchCol: null,                 div: 1 },
+  'Blasts/C':     { leaderEp: 'bat_tracking', leaderCol: 'blast_per_bat_contact',      searchCol: null,                 div: 1 },
+  'Blasts/Sw':    { leaderEp: 'bat_tracking', leaderCol: 'blast_per_swing',            searchCol: null,                 div: 1 },
+  'SqUp/C':       { leaderEp: 'bat_tracking', leaderCol: 'squared_up_per_bat_contact', searchCol: null,                 div: 1 },
+  'SqUp/Sw':      { leaderEp: 'bat_tracking', leaderCol: 'squared_up_per_swing',       searchCol: null,                 div: 1 },
+  'SwingLen':     { leaderEp: 'bat_tracking', leaderCol: 'swing_length',               searchCol: 'swing_length',       div: 1 },
+  'Swords':       { leaderEp: 'bat_tracking', leaderCol: 'swords',                     searchCol: null,                 div: 1 },
+  // Search-only bat tracking stats (not in leaderboard, available via statcast_search)
+  'AttackAngle':  { leaderEp: 'bat_tracking', leaderCol: null,                         searchCol: 'attack_angle',       div: 1 },
+  'AttackDir':    { leaderEp: 'bat_tracking', leaderCol: null,                         searchCol: 'attack_direction',   div: 1 },
+  'SwingTilt':    { leaderEp: 'bat_tracking', leaderCol: null,                         searchCol: 'swing_path_tilt',    div: 1 },
 };
 const SAVANT_KEYS = new Set(Object.keys(SAVANT_FIELD_DETAIL));
 
@@ -635,13 +639,16 @@ async function fetchSavantSearch(playerType, groupBy, season, dateRange) {
     hfGT:        'R|',   // regular season only
     hfSea:       `${season}|`,
     player_type: playerType,
-    game_date_gt: dateRange.dateGt,
-    game_date_lt: dateRange.dateLt,
     group_by:    groupBy,
     min_pitches: '0',
     min_results: '0',
     min_pas:     '0',
   });
+  // dateRange is optional — when null, hfSea alone provides full-season filtering
+  if (dateRange) {
+    params.set('game_date_gt', dateRange.dateGt);
+    params.set('game_date_lt', dateRange.dateLt);
+  }
   const resp = await fetch(`${SAVANT_PROXY}?${params}`);
   if (!resp.ok) throw new Error(`Savant search HTTP ${resp.status}`);
   const text = await resp.text();
@@ -700,7 +707,17 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
       if (skipFgKeys.has(fgKey)) continue;
       let raw;
       if (detail.leaderEp === 'bat_tracking') {
-        raw = btRow[detail.leaderCol];
+        if (useSearch && detail.searchCol) {
+          // Date-range mode: prefer statcast_search for the filtered period
+          raw = srchRow[detail.searchCol];
+        } else if (detail.leaderCol) {
+          // Full-season leaderboard; fall back to search for stats the leaderboard doesn't track
+          raw = btRow[detail.leaderCol];
+          if ((raw == null || raw === '') && detail.searchCol) raw = srchRow[detail.searchCol];
+        } else if (detail.searchCol) {
+          // Search-only stat (no leaderboard column at all)
+          raw = srchRow[detail.searchCol];
+        }
       } else if (useSearch && detail.searchCol) {
         // Date-range query: pull from statcast_search
         raw = srchRow[detail.searchCol];
@@ -837,14 +854,17 @@ const STAT_GROUPS_HITTING = [
     { key: 'maxEV', label: 'maxEV' },
   ]},
   { group: 'Bat Tracking', stats: [
-    { key: 'BatSpeed',   label: 'Bat Speed'  },
-    { key: 'FastSwing%', label: 'Fast Swing%' },
-    { key: 'Blasts/C',  label: 'Blasts/C'   },
-    { key: 'Blasts/Sw', label: 'Blasts/Sw'  },
-    { key: 'SqUp/C',    label: 'Sq-Up/C'    },
-    { key: 'SqUp/Sw',   label: 'Sq-Up/Sw'   },
-    { key: 'SwingLen',  label: 'Swing Len'  },
-    { key: 'Swords',    label: 'Swords'     },
+    { key: 'BatSpeed',    label: 'Bat Speed'    },
+    { key: 'FastSwing%',  label: 'Fast Swing%'  },
+    { key: 'Blasts/C',   label: 'Blasts/C'     },
+    { key: 'Blasts/Sw',  label: 'Blasts/Sw'    },
+    { key: 'SqUp/C',     label: 'Sq-Up/C'      },
+    { key: 'SqUp/Sw',    label: 'Sq-Up/Sw'     },
+    { key: 'SwingLen',   label: 'Swing Len'    },
+    { key: 'Swords',     label: 'Swords'       },
+    { key: 'AttackAngle', label: 'Attack Angle' },
+    { key: 'AttackDir',   label: 'Attack Dir'   },
+    { key: 'SwingTilt',   label: 'Swing Tilt'   },
   ]},
   { group: 'Plus Stats', stats: [
     { key: 'AVG+', label: 'AVG+' }, { key: 'BB%+', label: 'BB%+' }, { key: 'K%+', label: 'K%+' },
@@ -1369,24 +1389,31 @@ async function generate() {
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
             }
 
-            // If X is a Savant stat, enrich prev year players with Savant leaderboard data.
-            // Bat tracking is excluded: its endpoint doesn't support year filtering,
-            // so both seasons would return identical data — useless and misleading.
+            // If X is a Savant stat, enrich prev year players with Savant data.
             const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
             const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
-            if (savantDetail && savantDetail.leaderEp !== 'bat_tracking') {
+            if (savantDetail) {
               try {
                 const lbType = isHitting ? 'batter' : 'pitcher';
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
-                const [scRows, expRows] = await Promise.all([
-                  savantDetail.leaderEp === 'statcast'
-                    ? fetchSavantLeaderboard(lbType, 'statcast', prevSeason)
-                    : Promise.resolve(null),
-                  savantDetail.leaderEp === 'expected_statistics'
-                    ? fetchSavantLeaderboard(lbType, 'expected_statistics', prevSeason)
-                    : Promise.resolve(null),
-                ]);
-                prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, false, '', skipKeys, false);
+                if (savantDetail.leaderEp === 'bat_tracking') {
+                  // Bat tracking leaderboard ignores year params — use statcast_search instead.
+                  // Only supported for stats that have a searchCol.
+                  if (savantDetail.searchCol) {
+                    const srchRows = await fetchSavantSearch(lbType, 'name', prevSeason, null);
+                    prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, false, '', skipKeys, true);
+                  }
+                } else {
+                  const [scRows, expRows] = await Promise.all([
+                    savantDetail.leaderEp === 'statcast'
+                      ? fetchSavantLeaderboard(lbType, 'statcast', prevSeason)
+                      : Promise.resolve(null),
+                    savantDetail.leaderEp === 'expected_statistics'
+                      ? fetchSavantLeaderboard(lbType, 'expected_statistics', prevSeason)
+                      : Promise.resolve(null),
+                  ]);
+                  prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, false, '', skipKeys, false);
+                }
               } catch (savantPrevErr) {
                 console.warn('Prev year Savant fetch failed:', savantPrevErr.message);
               }
@@ -1419,12 +1446,21 @@ async function generate() {
       const needsLbEp = ep => [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === ep);
       // Does either axis have a savant key at all?
       const needsAnySavant = [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]);
+      // Bat tracking stats that have a searchCol — need statcast_search even in full-season mode
+      // (search-only stats like AttackAngle have no leaderboard column; BatSpeed/SwingLen prefer search in date-range mode)
+      const needsBtSearch = isHitting && !isTeam && [xBk, yBk].some(k => {
+        const d = SAVANT_FIELD_DETAIL[k];
+        return d?.leaderEp === 'bat_tracking' && !!d.searchCol;
+      });
       // Does either axis need statcast_search (has a searchCol)?
-      const needsSearch = useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]?.searchCol);
+      const needsSearch = needsBtSearch || (useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]?.searchCol));
       // Do we still need leaderboard even in search mode? (for stats with no searchCol: xERA, maxEV, HardHit — excluding bat_tracking which has its own fetch)
       const needsLbEvenWithSearch = useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking');
-      // Bat tracking: hitters only, always full-season leaderboard (no date-range split support)
-      const needsBatTracking = isHitting && !isTeam && needsLbEp('bat_tracking');
+      // Bat tracking leaderboard: hitters only, full-season (for stats that have a leaderCol)
+      const needsBatTracking = isHitting && !isTeam && [xBk, yBk].some(k => {
+        const d = SAVANT_FIELD_DETAIL[k];
+        return d?.leaderEp === 'bat_tracking' && !!d.leaderCol;
+      });
 
       if (isCombined) {
         // Combined: hit_ and pit_ sides use leaderboard
@@ -1729,7 +1765,7 @@ function formatStat(v, key) {
   if (SLASH_KEYS.has(bk)) return v.toFixed(3);
   if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC','BatSpeed','SwingLen'].includes(bk)) return v.toFixed(1);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt'].includes(bk)) return v.toFixed(1);
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
