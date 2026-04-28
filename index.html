@@ -1359,9 +1359,10 @@ async function generate() {
     }
 
     // Fetch previous season data when Y = "Prev Year (Same Stat)"
-    if (selY.value === '__prev_year__' && !isCombined && !isTeam) {
+    if (selY.value === '__prev_year__' && !isCombined) {
       const prevSeason = String(parseInt(season) - 1);
-      const prevQual = isHitting ? '200' : '50';
+      // Team mode: no qualifier filter (use all teams); player mode: 50 IP / 200 PA
+      const prevQual = isTeam ? '0' : (isHitting ? '200' : '50');
       const prevParams = new URLSearchParams({
         pos: 'all',
         stats: isHitting ? 'bat' : selStats.value,
@@ -1370,7 +1371,7 @@ async function generate() {
         type: '4',
         season: prevSeason, season1: prevSeason,
         month: '0', ind: '0',
-        hand: '', team: '0',
+        hand: '', team: isTeam ? '0,ts' : '0',
         pageitems: '10000', pagenum: '1',
         sortstat: 'WAR', sortdir: 'default'
       });
@@ -1394,13 +1395,13 @@ async function generate() {
             const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
             if (savantDetail) {
               try {
-                const lbType = isHitting ? 'batter' : 'pitcher';
+                const lbType = (isHitting ? 'batter' : 'pitcher') + (isTeam ? '-team' : '');
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
                 if (savantDetail.leaderEp === 'bat_tracking') {
                   // Bat tracking leaderboard ignores year params — use statcast_search instead.
-                  // Only supported for stats that have a searchCol.
-                  if (savantDetail.searchCol) {
-                    const srchRows = await fetchSavantSearch(lbType, 'name', prevSeason, null);
+                  // Only supported for stats that have a searchCol; team mode not supported.
+                  if (savantDetail.searchCol && !isTeam) {
+                    const srchRows = await fetchSavantSearch('batter', 'name', prevSeason, null);
                     prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, false, '', skipKeys, true);
                   }
                 } else {
@@ -1412,7 +1413,7 @@ async function generate() {
                       ? fetchSavantLeaderboard(lbType, 'expected_statistics', prevSeason)
                       : Promise.resolve(null),
                   ]);
-                  prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, false, '', skipKeys, false);
+                  prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: scRows, expected: expRows }, isTeam, '', skipKeys, false);
                 }
               } catch (savantPrevErr) {
                 console.warn('Prev year Savant fetch failed:', savantPrevErr.message);
@@ -1422,10 +1423,13 @@ async function generate() {
             const xKeyRaw = selX.value;
             const prevMap = {};
             for (const p of prevPlayers) {
-              if (p.playerid != null) prevMap[p.playerid] = p[xKeyRaw] ?? null;
+              // Team mode: key by TeamName (FG's team abbr); player mode: key by playerid
+              const key = isTeam ? (p.TeamName || p.TeamNameAbb) : p.playerid;
+              if (key != null) prevMap[key] = p[xKeyRaw] ?? null;
             }
             for (const p of currentData) {
-              p['__prev_year__'] = prevMap[p.playerid] ?? null;
+              const key = isTeam ? (p.TeamName || p.TeamNameAbb) : p.playerid;
+              p['__prev_year__'] = prevMap[key] ?? null;
             }
             currentPrevYearSeason = parseInt(prevSeason);
           }
