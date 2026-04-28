@@ -449,7 +449,13 @@
         <div class="plot-area" id="plot-area"></div>
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+      <div id="size-toggle" style="display:none;gap:2px;display:none;">
+        <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
+        <button class="size-btn active" data-scale="0.7" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
+        <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
+        <button class="size-btn" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
+      </div>
       <button id="btn-download" style="display:none;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
     </div>
   </div>
@@ -982,6 +988,7 @@ let zoomState = null;    // { xMin, xMax, yMin, yMax } in display coords, or nul
 let currentScale = null; // { xMin, xMax, yMin, yMax, plotW, plotH } — saved each render
 let tappedDotKey = null; // mobile: key of dot awaiting second tap to dismiss
 let justDragged = false; // prevents dot click firing after a zoom drag
+let currentDotScale = 0.7; // headshot size multiplier: 0.7 = S, 1.0 = M, 1.4 = L
 
 // Elements
 const selSeason = document.getElementById('sel-season');
@@ -1006,6 +1013,21 @@ const axisLabelY = document.getElementById('axis-label-y');
 const selSplit = document.getElementById('sel-split');
 const btnReset = document.getElementById('btn-reset');
 const btnDownload = document.getElementById('btn-download');
+const sizeToggle = document.getElementById('size-toggle');
+
+// Size toggle buttons
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentDotScale = parseFloat(btn.dataset.scale);
+    document.querySelectorAll('.size-btn').forEach(b => {
+      const active = b === btn;
+      b.style.background = active ? '#1a1a1a' : '#fff';
+      b.style.color = active ? '#fff' : '#555';
+      b.classList.toggle('active', active);
+    });
+    rerenderLayout();
+  });
+});
 
 const PITCHING_TYPE_OPTIONS = [
   { value: 'pit', label: 'All Pitchers' },
@@ -1097,6 +1119,7 @@ function switchMode(mode) {
   hiddenKeys.clear();
   btnReset.style.display = 'none';
   btnDownload.style.display = 'none';
+  sizeToggle.style.display = 'none';
 }
 
 // Init
@@ -1234,6 +1257,7 @@ async function generate() {
 
   btnGenerate.disabled = true;
   btnDownload.style.display = 'none';
+  sizeToggle.style.display = 'none';
   chartStatus.textContent = 'Loading...';
   chartStatus.classList.remove('error');
   chartStatus.style.display = 'flex';
@@ -1513,6 +1537,7 @@ async function generate() {
     currentYKey = selY.value;
     chartStatus.style.display = 'none';
     btnDownload.style.display = 'block';
+    sizeToggle.style.display = 'flex';
     rerenderLayout();
   } catch (e) {
     chartStatus.textContent = `Error: ${e.message}`;
@@ -1597,10 +1622,11 @@ function rerenderLayout() {
   plotArea.style.height = plotH + 'px';
   currentScale = { xMin, xMax, yMin, yMax, plotW, plotH };
 
-  // Dot size — larger for team logos
-  const dotSize = isTeamMode
+  // Dot size — scaled by currentDotScale (S/M/L toggle); larger base for team logos
+  const baseDotSize = isTeamMode
     ? Math.round(Math.min(44, Math.max(36, plotW / 28)))
     : Math.round(Math.min(32, Math.max(28, plotW / 40)));
+  const dotSize = Math.round(baseDotSize * currentDotScale);
 
   // Nice tick generation
   function niceTicks(min, max, count) {
