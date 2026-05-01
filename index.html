@@ -252,7 +252,7 @@
       height: 100%;
       border-radius: 50%;
       object-fit: cover;
-      object-position: 50% 50%;
+      object-position: 50% 60%;
       display: block;
     }
     .team-dot {
@@ -1231,8 +1231,7 @@ function switchMode(mode) {
 })();
 
 function headshotUrl(mlbamId) {
-  // c_thumb,g_face asks the MLB Cloudinary CDN to auto-crop a square centered on the detected face
-  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_120,h_120,c_thumb,g_face,q_auto:best/v1/people/${mlbamId}/headshot/67/current`;
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_60,q_auto:best/v1/people/${mlbamId}/headshot/67/current`;
 }
 
 async function generate() {
