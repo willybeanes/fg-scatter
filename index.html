@@ -1231,7 +1231,8 @@ function switchMode(mode) {
 })();
 
 function headshotUrl(mlbamId) {
-  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_60,q_auto:best/v1/people/${mlbamId}/headshot/67/current`;
+  // c_thumb,g_face asks the MLB Cloudinary CDN to auto-crop a square centered on the detected face
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_120,h_120,c_thumb,g_face,q_auto:best/v1/people/${mlbamId}/headshot/67/current`;
 }
 
 async function generate() {
@@ -1724,22 +1725,18 @@ function rerenderLayout() {
   }
 
   // Dots (player headshots or team logos)
-  // Player dots are slightly taller than wide (1.25×) so the 2:3 portrait image shows
-  // ~83% of its height instead of 67%, ensuring the chin is always visible.
-  const dotH = isTeamMode ? dotSize : Math.round(dotSize * 1.25);
   const half = dotSize / 2;
-  const halfH = dotH / 2;
   const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   for (const p of visible) {
     const xPct = (displayVal(p[xKey], xKey) - xMin) / (xMax - xMin);
     const yPct = 1 - (displayVal(p[yKey], yKey) - yMin) / (yMax - yMin);
     const left = xPct * plotW - half;
-    const top = yPct * plotH - halfH;
+    const top = yPct * plotH - half;
 
     const dot = document.createElement('div');
     dot.className = 'player-dot' + (isTeamMode ? ' team-dot' : '');
     dot.style.width = dotSize + 'px';
-    dot.style.height = dotH + 'px';
+    dot.style.height = dotSize + 'px';
     dot.style.left = left + 'px';
     dot.style.top = top + 'px';
 
