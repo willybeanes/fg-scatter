@@ -1699,6 +1699,30 @@ function rerenderLayout() {
   avgLabelY.textContent = `avg ${formatStat(yAvg, yKey)}`;
   plotArea.appendChild(avgLabelY);
 
+  // Diagonal y=x reference line (only for Prev Year comparison)
+  if (yKey === '__prev_year__') {
+    // Find where y=x clips to the visible [xMin,xMax] × [yMin,yMax] box
+    const diagStart = Math.max(xMin, yMin);
+    const diagEnd   = Math.min(xMax, yMax);
+    if (diagEnd > diagStart) {
+      const x1 = ((diagStart - xMin) / (xMax - xMin)) * plotW;
+      const y1 = (1 - (diagStart - yMin) / (yMax - yMin)) * plotH;
+      const x2 = ((diagEnd   - xMin) / (xMax - xMin)) * plotW;
+      const y2 = (1 - (diagEnd   - yMin) / (yMax - yMin)) * plotH;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('stroke', '#999');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-dasharray', '5 4');
+      line.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(line);
+      plotArea.appendChild(svg);
+    }
+  }
+
   // Dots (player headshots or team logos)
   const half = dotSize / 2;
   const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
