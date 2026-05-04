@@ -849,6 +849,7 @@ const STAT_GROUPS_HITTING = [
     { key: 'Z-Contact%', label: 'Z-Contact%' }, { key: 'Contact%', label: 'Contact%' },
     { key: 'Zone%', label: 'Zone%' }, { key: 'F-Strike%', label: 'F-Strike%' },
     { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
+    { key: 'sSEAGER', label: 'sSEAGER' },
   ]},
   { group: 'Baserunning', stats: [
     { key: 'SB', label: 'SB' }, { key: 'CS', label: 'CS' }, { key: 'SB+CS', label: 'SB+CS' },
@@ -1234,6 +1235,25 @@ function headshotUrl(mlbamId) {
   return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_60,q_auto:best/v1/people/${mlbamId}/headshot/67/current`;
 }
 
+// Compute sSEAGER (Simple SEAGER) for an array of hitter rows.
+// Formula: D/(A+D) − C/(C+D)  where A=zone swings, C=zone takes, D=ozone takes.
+// Requires Zone%, Z-Swing%, O-Swing%, and Pitches (all present in FG bat leaderboard).
+function addSSEAGER(players) {
+  for (const p of players) {
+    const pitches = p['Pitches'];
+    if (!pitches) { p['sSEAGER'] = null; continue; }
+    const zonePct = p['Zone%']    || 0;  // stored as 0–1 decimal
+    const zSwing  = p['Z-Swing%'] || 0;
+    const oSwing  = p['O-Swing%'] || 0;
+    const zPit = zonePct * pitches;
+    const oPit = (1 - zonePct) * pitches;
+    const A = zSwing * zPit;           // zone swings (good swing)
+    const C = (1 - zSwing) * zPit;    // zone takes  (missed opportunity)
+    const D = (1 - oSwing) * oPit;    // out-of-zone takes (good take)
+    p['sSEAGER'] = (A + D > 0 && C + D > 0) ? D / (A + D) - C / (C + D) : null;
+  }
+}
+
 async function generate() {
   const season = selSeason.value;
   const isCombined = currentMode === 'combined';
@@ -1381,6 +1401,7 @@ async function generate() {
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
     }
+    if (isHitting) addSSEAGER(currentData);
 
     // Fetch previous season data when Y = "Prev Year (Same Stat)"
     if (selY.value === '__prev_year__' && !isCombined) {
@@ -1413,6 +1434,7 @@ async function generate() {
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
             }
+            if (isHitting) addSSEAGER(prevPlayers);
 
             // If X is a Savant stat, enrich prev year players with Savant data.
             const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
@@ -1813,7 +1835,7 @@ function displayVal(val, key) {
 }
 
 // Stats displayed as .xxx (batting average format)
-const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG']);
+const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG','sSEAGER']);
 
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
