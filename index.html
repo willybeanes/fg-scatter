@@ -452,8 +452,8 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
       <div id="size-toggle" style="display:none;gap:2px;display:none;">
         <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
-        <button class="size-btn active" data-scale="0.7" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
-        <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
+        <button class="size-btn" data-scale="0.7" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
+        <button class="size-btn active" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
         <button class="size-btn" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
       </div>
       <button id="btn-download" style="display:none;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
@@ -1006,7 +1006,7 @@ let zoomState = null;    // { xMin, xMax, yMin, yMax } in display coords, or nul
 let currentScale = null; // { xMin, xMax, yMin, yMax, plotW, plotH } — saved each render
 let tappedDotKey = null; // mobile: key of dot awaiting second tap to dismiss
 let justDragged = false; // prevents dot click firing after a zoom drag
-let currentDotScale = 0.7; // headshot size multiplier: 0.7 = S, 1.0 = M, 1.4 = L
+let currentDotScale = 1.0; // headshot size multiplier: 0.7 = S, 1.0 = M, 1.4 = L
 
 // Elements
 const selSeason = document.getElementById('sel-season');
