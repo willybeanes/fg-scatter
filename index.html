@@ -440,7 +440,12 @@
         </div>
         <div class="control-group">
           <label>&nbsp;</label>
-          <button id="btn-generate">Generate</button>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button id="btn-generate">Generate</button>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:500;color:#555;white-space:nowrap;">
+              <input type="checkbox" id="chk-r2" style="cursor:pointer;accent-color:#1a1a1a;width:14px;height:14px;"> R² line
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -1025,6 +1030,7 @@ const selGroup = document.getElementById('sel-group');
 const selX = document.getElementById('sel-x');
 const selY = document.getElementById('sel-y');
 const selColor = document.getElementById('sel-color');
+const chkR2 = document.getElementById('chk-r2');
 const btnGenerate = document.getElementById('btn-generate');
 const chartStatus = document.getElementById('chart-status');
 const chartArea = document.getElementById('chart-area');
@@ -1053,6 +1059,8 @@ document.querySelectorAll('.size-btn').forEach(btn => {
     rerenderLayout();
   });
 });
+
+chkR2.addEventListener('change', () => { if (currentData) rerenderLayout(); });
 
 const PITCHING_TYPE_OPTIONS = [
   { value: 'pit', label: 'All Pitchers' },
@@ -1824,6 +1832,47 @@ function rerenderLayout() {
     }
   }
 
+  // R² regression line
+  if (chkR2.checked && visible.length >= 2 && yKey !== '__prev_year__') {
+    const points = visible
+      .map(p => [displayVal(p[xKey], xKey), displayVal(p[yKey], yKey)])
+      .filter(([x, y]) => isFinite(x) && isFinite(y));
+    const reg = linearRegression(points);
+    if (reg) {
+      // Compute line endpoints clipped to visible range
+      const x1 = xMin, y1 = reg.m * xMin + reg.b;
+      const x2 = xMax, y2 = reg.m * xMax + reg.b;
+      const toPlot = (x, y) => [
+        ((x - xMin) / (xMax - xMin)) * plotW,
+        (1 - (y - yMin) / (yMax - yMin)) * plotH,
+      ];
+      const [px1, py1] = toPlot(x1, Math.max(yMin, Math.min(yMax, y1)));
+      const [px2, py2] = toPlot(x2, Math.max(yMin, Math.min(yMax, y2)));
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;';
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', px1); line.setAttribute('y1', py1);
+      line.setAttribute('x2', px2); line.setAttribute('y2', py2);
+      line.setAttribute('stroke', '#4a90d9');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-dasharray', '6 3');
+      line.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(line);
+      // R² label
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const lx = px2 - 4, ly = Math.max(14, Math.min(plotH - 4, py2 - 8));
+      label.setAttribute('x', lx); label.setAttribute('y', ly);
+      label.setAttribute('text-anchor', 'end');
+      label.setAttribute('font-size', '11');
+      label.setAttribute('font-family', 'inherit');
+      label.setAttribute('fill', '#4a90d9');
+      label.setAttribute('font-weight', '500');
+      label.textContent = `R² = ${reg.r2.toFixed(3)}`;
+      svg.appendChild(label);
+      plotArea.appendChild(svg);
+    }
+  }
+
   // Color ring legend
   if (colorKey && cCount > 0) {
     const colorLabel = STAT_OPTIONS.find(s => s.key === colorKey)?.label || colorKey;
@@ -1957,6 +2006,23 @@ function displayVal(val, key) {
   // Treat that as 0 so players aren't incorrectly excluded from the chart.
   if (val == null) return COUNTING_KEYS.has(baseKey(key)) ? 0 : val;
   return PCT_KEYS.has(baseKey(key)) ? val * 100 : val;
+}
+
+// Linear regression: returns { m, b, r2 } for y = m*x + b
+function linearRegression(points) {
+  const n = points.length;
+  if (n < 2) return null;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (const [x, y] of points) { sumX += x; sumY += y; sumXY += x*y; sumXX += x*x; }
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return null;
+  const m = (n * sumXY - sumX * sumY) / denom;
+  const b = (sumY - m * sumX) / n;
+  const yMean = sumY / n;
+  let ssTot = 0, ssRes = 0;
+  for (const [x, y] of points) { ssTot += (y - yMean) ** 2; ssRes += (y - (m*x + b)) ** 2; }
+  const r2 = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+  return { m, b, r2 };
 }
 
 // Map a 0–1 fraction to a red→yellow→green color (for color ring legend)
