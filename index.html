@@ -2059,10 +2059,12 @@ function downloadCSV() {
   // Only the two axes shown on the chart
   const xLabel = STAT_OPTIONS.find(s => s.key === currentXKey)?.label || currentXKey;
   const yLabel = STAT_OPTIONS.find(s => s.key === currentYKey)?.label || currentYKey;
+  const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
 
   // Header row
   const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
   headers.push(xLabel, yLabel);
+  if (colorLabel) headers.push(colorLabel);
 
   // Data rows — only include rows with valid x and y values
   const csvRows = [headers.join(',')];
@@ -2074,6 +2076,10 @@ function downloadCSV() {
     cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
     cols.push(formatStat(displayVal(xv, currentXKey), currentXKey));
     cols.push(formatStat(displayVal(yv, currentYKey), currentYKey));
+    if (colorLabel) {
+      const cv = p[currentColorKey];
+      cols.push(cv != null && isFinite(cv) ? formatStat(displayVal(cv, currentColorKey), currentColorKey) : '');
+    }
     csvRows.push(cols.join(','));
   }
 
