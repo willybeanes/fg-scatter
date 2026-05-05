@@ -435,6 +435,10 @@
           <select id="sel-y"></select>
         </div>
         <div class="control-group">
+          <label>Color Ring</label>
+          <select id="sel-color"></select>
+        </div>
+        <div class="control-group">
           <label>&nbsp;</label>
           <button id="btn-generate">Generate</button>
         </div>
@@ -452,9 +456,9 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
       <div id="size-toggle" style="display:none;gap:2px;display:none;">
         <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
-        <button class="size-btn" data-scale="0.7" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
-        <button class="size-btn active" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
-        <button class="size-btn" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
+        <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
+        <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
+        <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
       </div>
       <button id="btn-download" style="display:none;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
     </div>
@@ -1006,7 +1010,8 @@ let zoomState = null;    // { xMin, xMax, yMin, yMax } in display coords, or nul
 let currentScale = null; // { xMin, xMax, yMin, yMax, plotW, plotH } — saved each render
 let tappedDotKey = null; // mobile: key of dot awaiting second tap to dismiss
 let justDragged = false; // prevents dot click firing after a zoom drag
-let currentDotScale = 1.0; // headshot size multiplier: 0.7 = S, 1.0 = M, 1.4 = L
+let currentDotScale = 1.4; // headshot size multiplier: 1.0 = S, 1.4 = M, 1.9 = L
+let currentColorKey = 'none'; // color ring stat key, or 'none'
 
 // Elements
 const selSeason = document.getElementById('sel-season');
@@ -1018,6 +1023,7 @@ const selTeam = document.getElementById('sel-team');
 const selGroup = document.getElementById('sel-group');
 const selX = document.getElementById('sel-x');
 const selY = document.getElementById('sel-y');
+const selColor = document.getElementById('sel-color');
 const btnGenerate = document.getElementById('btn-generate');
 const chartStatus = document.getElementById('chart-status');
 const chartArea = document.getElementById('chart-area');
@@ -1078,6 +1084,21 @@ function populateAxisDropdowns() {
   prevOg.label = 'Compare';
   prevOg.appendChild(new Option('Prev Year (Same Stat)', '__prev_year__'));
   selY.appendChild(prevOg);
+
+  // Color ring: same stat list, no Prev Year, plus a "None" option
+  const prevColorKey = selColor.value;
+  selColor.innerHTML = '';
+  selColor.appendChild(new Option('None', 'none'));
+  STAT_GROUPS.forEach(g => {
+    const og = document.createElement('optgroup');
+    og.label = g.group;
+    g.stats.forEach(s => og.appendChild(new Option(s.label, s.key)));
+    selColor.appendChild(og);
+  });
+  // Restore previous selection if still valid
+  if (prevColorKey && [...selColor.options].some(o => o.value === prevColorKey)) {
+    selColor.value = prevColorKey;
+  }
 }
 
 function switchMode(mode) {
@@ -1192,6 +1213,7 @@ function switchMode(mode) {
   }
   if (urlP.has('x')) selX.value = urlP.get('x');
   if (urlP.has('y')) selY.value = urlP.get('y');
+  if (urlP.has('color')) selColor.value = urlP.get('color');
   updateSplitAvailability();
   if (urlP.has('season') || urlP.has('x') || urlP.has('y')) generate();
 
@@ -1290,6 +1312,7 @@ async function generate() {
   }
   urlState.set('x', selX.value);
   urlState.set('y', selY.value);
+  if (selColor.value !== 'none') urlState.set('color', selColor.value);
   history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
@@ -1509,33 +1532,34 @@ async function generate() {
 
     // Enrich with fresh Baseball Savant data for statcast/xstat metrics
     const xBk = baseKey(selX.value), yBk = baseKey(selY.value);
+    const colorBk = selColor.value !== 'none' ? baseKey(selColor.value) : null;
+    // All three axes (x, y, color) may need Savant enrichment
+    const axisKeys = [xBk, yBk, ...(colorBk ? [colorBk] : [])];
     try {
       // Combined mode always uses leaderboard (no split controls shown)
       const dateRange = isCombined ? null : getSavantDateRange(selSplit.value, season);
       const useSearch = dateRange !== null;
 
-      // Helper: does either axis need a particular leaderboard endpoint?
-      const needsLbEp = ep => [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === ep);
-      // Does either axis have a savant key at all?
-      const needsAnySavant = [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]);
+      // Helper: does any axis need a particular leaderboard endpoint?
+      const needsLbEp = ep => axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === ep);
+      // Does any axis have a savant key at all?
+      const needsAnySavant = axisKeys.some(k => SAVANT_FIELD_DETAIL[k]);
       // Bat tracking stats that have a searchCol — need statcast_search even in full-season mode
-      // (search-only stats like AttackAngle have no leaderboard column; BatSpeed/SwingLen prefer search in date-range mode)
-      // Team mode is fine: statcast_search with group_by=team supports bat tracking aggregation
-      const needsBtSearch = isHitting && [xBk, yBk].some(k => {
+      const needsBtSearch = isHitting && axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
         return d?.leaderEp === 'bat_tracking' && !!d.searchCol;
       });
-      // Does either axis need statcast_search (has a searchCol)?
-      const needsSearch = needsBtSearch || (useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k]?.searchCol));
-      // Do we still need leaderboard even in search mode? (for stats with no searchCol: xERA, maxEV, HardHit — excluding bat_tracking which has its own fetch)
-      const needsLbEvenWithSearch = useSearch && [xBk, yBk].some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking');
+      // Does any axis need statcast_search (has a searchCol)?
+      const needsSearch = needsBtSearch || (useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.searchCol));
+      // Do we still need leaderboard even in search mode?
+      const needsLbEvenWithSearch = useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking');
       // Bat tracking leaderboard: hitters only, full-season (for stats that have a leaderCol)
-      const needsBatTracking = isHitting && !isTeam && [xBk, yBk].some(k => {
+      const needsBatTracking = isHitting && !isTeam && axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
         return d?.leaderEp === 'bat_tracking' && !!d.leaderCol;
       });
       // Custom leaderboard stats (e.g. xwOBACON) — always full-season, player-level only
-      const customSelections = [xBk, yBk].flatMap(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === 'custom' ? SAVANT_FIELD_DETAIL[k].selections : []);
+      const customSelections = axisKeys.flatMap(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === 'custom' ? SAVANT_FIELD_DETAIL[k].selections : []);
       const needsCustom = !isTeam && customSelections.length > 0;
 
       if (isCombined) {
@@ -1583,6 +1607,7 @@ async function generate() {
 
     currentXKey = selX.value;
     currentYKey = selY.value;
+    currentColorKey = selColor.value;
     chartStatus.style.display = 'none';
     btnDownload.style.display = 'block';
     sizeToggle.style.display = 'flex';
@@ -1664,16 +1689,43 @@ function rerenderLayout() {
   const xAvg = xSum / (visible.length || 1);
   const yAvg = ySum / (visible.length || 1);
 
-  // Plot dimensions
-  const plotW = plotArea.clientWidth;
+  // Color ring range — compute min/max/avg of the color stat across ALL valid players (not just visible)
+  const colorKey = currentColorKey !== 'none' ? currentColorKey : null;
+  let cMin = Infinity, cMax = -Infinity, cSum = 0, cCount = 0;
+  if (colorKey) {
+    for (const p of valid) {
+      const cv = displayVal(p[colorKey], colorKey);
+      if (cv == null || !isFinite(cv)) continue;
+      if (cv < cMin) cMin = cv;
+      if (cv > cMax) cMax = cv;
+      cSum += cv; cCount++;
+    }
+  }
+  const cAvg = cCount > 0 ? cSum / cCount : null;
+  const cRange = (cMax - cMin) || 1;
+
+  // Plot dimensions — only reserve right-side space for legend if a dot would land under it
+  const rawPlotW = plotArea.clientWidth;
   const plotH = Math.max(400, window.innerHeight - 300);
+  let needsLegendReserve = false;
+  if (colorKey && cCount > 0) {
+    const legX = rawPlotW - 145, legH = 140;
+    needsLegendReserve = visible.some(p => {
+      const xv = displayVal(p[xKey], xKey), yv = displayVal(p[yKey], yKey);
+      if (!isFinite(xv) || !isFinite(yv)) return false;
+      const px = ((xv - xMin) / (xMax - xMin)) * rawPlotW;
+      const py = (1 - (yv - yMin) / (yMax - yMin)) * plotH;
+      return px > legX && py < legH;
+    });
+  }
+  const plotW = rawPlotW - (needsLegendReserve ? 135 : 0);
   plotArea.style.height = plotH + 'px';
   currentScale = { xMin, xMax, yMin, yMax, plotW, plotH };
 
   // Dot size — scaled by currentDotScale (S/M/L toggle); larger base for team logos
   const baseDotSize = isTeamMode
     ? Math.round(Math.min(44, Math.max(36, plotW / 28)))
-    : Math.round(Math.min(32, Math.max(28, plotW / 40)));
+    : Math.round(Math.min(36, Math.max(32, plotW / 40)));
   const dotSize = Math.round(baseDotSize * currentDotScale);
 
   // Nice tick generation
@@ -1771,6 +1823,32 @@ function rerenderLayout() {
     }
   }
 
+  // Color ring legend
+  if (colorKey && cCount > 0) {
+    const colorLabel = STAT_OPTIONS.find(s => s.key === colorKey)?.label || colorKey;
+    const legend = document.createElement('div');
+    legend.style.cssText = `
+      position:absolute; top:10px; right:10px; z-index:20;
+      background:rgba(255,255,255,0.93); border:1px solid rgba(0,0,0,0.08);
+      border-radius:10px; padding:10px 13px; font-size:11px; line-height:1.4;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08); pointer-events:none; min-width:100px;
+    `;
+    const barH = 72;
+    legend.innerHTML = `
+      <div style="font-weight:600;margin-bottom:8px;color:#333;">${colorLabel}</div>
+      <div style="display:flex;gap:8px;align-items:stretch;">
+        <div style="width:10px;height:${barH}px;border-radius:5px;flex-shrink:0;
+          background:linear-gradient(to top,${lowerIsBetter(colorKey) ? ringColor(1)+','+ringColor(0.5)+','+ringColor(0) : ringColor(0)+','+ringColor(0.5)+','+ringColor(1)});"></div>
+        <div style="display:flex;flex-direction:column;justify-content:space-between;height:${barH}px;color:#555;">
+          <span>${formatStat(cMax, colorKey)}</span>
+          <span style="color:#999;">${formatStat(cAvg, colorKey)} avg</span>
+          <span>${formatStat(cMin, colorKey)}</span>
+        </div>
+      </div>
+    `;
+    plotArea.appendChild(legend);
+  }
+
   // Dots (player headshots or team logos)
   const half = dotSize / 2;
   const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
@@ -1786,6 +1864,26 @@ function rerenderLayout() {
     dot.style.height = dotSize + 'px';
     dot.style.left = left + 'px';
     dot.style.top = top + 'px';
+
+    // Color ring
+    if (colorKey) {
+      const cv = displayVal(p[colorKey], colorKey);
+      if (cv != null && isFinite(cv)) {
+        const tRaw = (cv - cMin) / cRange;
+        const t = lowerIsBetter(colorKey) ? 1 - tRaw : tRaw;
+        if (isTeamMode) {
+          // Team logos: translucent filled circle behind the logo (slightly smaller than logo)
+          const circle = document.createElement('div');
+          const inset = -Math.round(dotSize * 0.04);
+          circle.style.cssText = `position:absolute;inset:${inset}px;border-radius:50%;background:${ringColor(t)};opacity:0.4;z-index:-1;`;
+          dot.appendChild(circle);
+        } else {
+          // Player headshots: colored ring via box-shadow
+          const ringW = Math.max(2, Math.round(dotSize * 0.09));
+          dot.style.boxShadow = `0 0 0 ${ringW}px ${ringColor(t)}`;
+        }
+      }
+    }
 
     const img = document.createElement('img');
     if (isTeamMode) {
@@ -1831,7 +1929,7 @@ function rerenderLayout() {
 
 // Percentage keys come back as decimals (0.32 = 32%) — convert for display
 const PCT_KEYS = new Set([
-  'K%','BB%','K-BB%','BABIP','LOB%','GB%','FB%','HR/FB','SwStr%','IFFB%','LD%',
+  'K%','BB%','K-BB%','LOB%','GB%','FB%','HR/FB','SwStr%','IFFB%','LD%',
   'O-Swing%','Z-Swing%','Swing%','O-Contact%','Z-Contact%','Contact%','Zone%','F-Strike%',
   'CStr%','C+SwStr%','IFH%','BUH%','TTO%',
   'pfxFA%','pfxFT%','pfxFC%','pfxFS%','pfxFO%','pfxSI%','pfxSL%','pfxCU%',
@@ -1860,8 +1958,32 @@ function displayVal(val, key) {
   return PCT_KEYS.has(baseKey(key)) ? val * 100 : val;
 }
 
+// Map a 0–1 fraction to a red→yellow→green color (for color ring legend)
+function ringColor(t) {
+  const h = Math.round(t * 120); // 0 = red, 60 = yellow, 120 = green
+  return `hsl(${h}, 80%, 42%)`;
+}
+
+// Stats where a lower value is better (color ring should invert: red=high, green=low)
+const LOWER_IS_BETTER_ALWAYS = new Set([
+  'ERA','FIP','xFIP','SIERA','xERA',
+  'WHIP','H/9','BB/9','HR/9',
+  'ERA-','FIP-','xFIP-',
+  'L','BS','-WPA',
+]);
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','K-BB%','HR/FB']);
+const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS']);
+
+function lowerIsBetter(key) {
+  const bk = baseKey(key);
+  if (LOWER_IS_BETTER_ALWAYS.has(bk)) return true;
+  if (currentMode !== 'hitting' && LOWER_IS_BETTER_PITCHING.has(bk)) return true;
+  if (currentMode === 'hitting'  && LOWER_IS_BETTER_HITTING.has(bk))  return true;
+  return false;
+}
+
 // Stats displayed as .xxx (batting average format)
-const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG','xwOBACON','sSEAGER']);
+const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG','xwOBACON','sSEAGER','BABIP']);
 
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
@@ -1893,9 +2015,12 @@ function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
     const vol = isHit ? `${Math.round(player.PA || 0)} PA` : `${formatStat(player.IP || 0, 'IP')} IP`;
     ttMeta.textContent = `${player.TeamName || player.TeamNameAbb || ''}  |  ${hand}  |  ${vol}`;
   }
+  const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
+  const colorVal = colorLabel != null ? displayVal(player[currentColorKey], currentColorKey) : null;
   ttStats.innerHTML = `
     <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[xKey], xKey), xKey)}</span></div>
     <div class="tooltip-stat"><span class="tooltip-stat-label">${yLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[yKey], yKey), yKey)}</span></div>
+    ${colorLabel != null && colorVal != null && isFinite(colorVal) ? `<div class="tooltip-stat"><span class="tooltip-stat-label">${colorLabel}</span><span class="tooltip-stat-value">${formatStat(colorVal, currentColorKey)}</span></div>` : ''}
   `;
   tooltip.style.display = 'block';
   moveTooltip(e);
