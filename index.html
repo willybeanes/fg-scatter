@@ -491,6 +491,7 @@ const SAVANT_FIELD_DETAIL = {
   'xSLG':     { leaderEp: 'expected_statistics', leaderCol: 'est_slg',                 searchCol: 'xslg',                    div: 1   },
   'xERA':     { leaderEp: 'expected_statistics', leaderCol: 'xera',                    searchCol: null,                      div: 1   },
   'xwOBACON': { leaderEp: 'custom',             leaderCol: 'xwobacon',                searchCol: null,                      div: 1, selections: ['xwobacon'] },
+  'EV50':     { leaderEp: 'custom',             leaderCol: 'avg_best_speed',           searchCol: null,                      div: 1, selections: ['avg_best_speed'] },
   // Bat tracking — leaderboard only (no date-range split support)
   'BatSpeed':     { leaderEp: 'bat_tracking', leaderCol: 'avg_bat_speed',              searchCol: 'bat_speed',          div: 1 },
   'FastSwing%':   { leaderEp: 'bat_tracking', leaderCol: 'hard_swing_rate',            searchCol: null,                 div: 1 },
@@ -877,7 +878,7 @@ const STAT_GROUPS_HITTING = [
     { key: 'BaseRunning', label: 'BsR' }, { key: 'Spd', label: 'Spd' },
   ]},
   { group: 'Batted Ball Quality', stats: [
-    { key: 'EV', label: 'EV' }, { key: 'LA', label: 'LA' },
+    { key: 'EV', label: 'EV' }, { key: 'EV50', label: 'EV50' }, { key: 'LA', label: 'LA' },
     { key: 'Barrel%', label: 'Barrel%' }, { key: 'HardHit%', label: 'HardHit%' },
     { key: 'maxEV', label: 'maxEV' },
   ]},
