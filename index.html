@@ -1047,6 +1047,13 @@ const btnDownload = document.getElementById('btn-download');
 const sizeToggle = document.getElementById('size-toggle');
 
 // Size toggle buttons
+function syncUrlExtras() {
+  const urlP = new URLSearchParams(window.location.search);
+  urlP.set('size', currentDotScale);
+  if (chkR2.checked) urlP.set('r2', '1'); else urlP.delete('r2');
+  history.replaceState(null, '', '?' + urlP.toString());
+}
+
 document.querySelectorAll('.size-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     currentDotScale = parseFloat(btn.dataset.scale);
@@ -1057,10 +1064,11 @@ document.querySelectorAll('.size-btn').forEach(btn => {
       b.classList.toggle('active', active);
     });
     rerenderLayout();
+    syncUrlExtras();
   });
 });
 
-chkR2.addEventListener('change', () => { if (currentData) rerenderLayout(); });
+chkR2.addEventListener('change', () => { if (currentData) rerenderLayout(); syncUrlExtras(); });
 
 const PITCHING_TYPE_OPTIONS = [
   { value: 'pit', label: 'All Pitchers' },
@@ -1223,6 +1231,19 @@ function switchMode(mode) {
   if (urlP.has('x')) selX.value = urlP.get('x');
   if (urlP.has('y')) selY.value = urlP.get('y');
   if (urlP.has('color')) selColor.value = urlP.get('color');
+  if (urlP.has('size')) {
+    const s = parseFloat(urlP.get('size'));
+    if ([1.0, 1.4, 1.9].includes(s)) {
+      currentDotScale = s;
+      document.querySelectorAll('.size-btn').forEach(b => {
+        const active = parseFloat(b.dataset.scale) === s;
+        b.classList.toggle('active', active);
+        b.style.background = active ? '#1a1a1a' : '#fff';
+        b.style.color = active ? '#fff' : '#555';
+      });
+    }
+  }
+  if (urlP.get('r2') === '1') chkR2.checked = true;
   updateSplitAvailability();
   if (urlP.has('season') || urlP.has('x') || urlP.has('y')) generate();
 
@@ -1322,6 +1343,8 @@ async function generate() {
   urlState.set('x', selX.value);
   urlState.set('y', selY.value);
   if (selColor.value !== 'none') urlState.set('color', selColor.value);
+  urlState.set('size', currentDotScale);
+  if (chkR2.checked) urlState.set('r2', '1');
   history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
