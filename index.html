@@ -496,7 +496,8 @@ const SAVANT_FIELD_DETAIL = {
   'xSLG':     { leaderEp: 'expected_statistics', leaderCol: 'est_slg',                 searchCol: 'xslg',                    div: 1   },
   'xERA':     { leaderEp: 'expected_statistics', leaderCol: 'xera',                    searchCol: null,                      div: 1   },
   'xwOBACON': { leaderEp: 'custom',             leaderCol: 'xwobacon',                searchCol: null,                      div: 1, selections: ['xwobacon'] },
-  'EV50':     { leaderEp: 'custom',             leaderCol: 'avg_best_speed',           searchCol: null,                      div: 1, selections: ['avg_best_speed'] },
+  'EV50':        { leaderEp: 'custom',          leaderCol: 'avg_best_speed',           searchCol: null,                      div: 1, selections: ['avg_best_speed'] },
+  'SprintSpeed': { leaderEp: 'custom',          leaderCol: 'sprint_speed',             searchCol: null,                      div: 1, selections: ['sprint_speed'] },
   // Bat tracking — leaderboard only (no date-range split support)
   'BatSpeed':     { leaderEp: 'bat_tracking', leaderCol: 'avg_bat_speed',              searchCol: 'bat_speed',          div: 1 },
   'FastSwing%':   { leaderEp: 'bat_tracking', leaderCol: 'hard_swing_rate',            searchCol: null,                 div: 1 },
@@ -881,6 +882,7 @@ const STAT_GROUPS_HITTING = [
   { group: 'Baserunning', stats: [
     { key: 'SB', label: 'SB' }, { key: 'CS', label: 'CS' }, { key: 'SB+CS', label: 'SB+CS' },
     { key: 'BaseRunning', label: 'BsR' }, { key: 'Spd', label: 'Spd' },
+    { key: 'SprintSpeed', label: 'Sprint Speed' },
   ]},
   { group: 'Batted Ball Quality', stats: [
     { key: 'EV', label: 'EV' }, { key: 'EV50', label: 'EV50' }, { key: 'LA', label: 'LA' },
@@ -2081,7 +2083,7 @@ function formatStat(v, key) {
   if (SLASH_KEYS.has(bk)) return v.toFixed(3);
   if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','LA','maxEV','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt'].includes(bk)) return v.toFixed(1);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt'].includes(bk)) return v.toFixed(1);
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
