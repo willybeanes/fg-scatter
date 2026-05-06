@@ -850,7 +850,7 @@ const STAT_GROUPS_HITTING = [
   { group: 'Counting', stats: [
     { key: 'G', label: 'G' }, { key: 'AB', label: 'AB' }, { key: 'PA', label: 'PA' },
     { key: 'H', label: 'H' }, { key: '1B', label: '1B' }, { key: '2B', label: '2B' },
-    { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' }, { key: 'R', label: 'R' },
+    { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' }, { key: 'XBH', label: 'XBH' }, { key: 'R', label: 'R' },
     { key: 'RBI', label: 'RBI' }, { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' },
     { key: 'SO', label: 'SO' }, { key: 'HBP', label: 'HBP' }, { key: 'TOB', label: 'TOB' },
     { key: 'SF', label: 'SF' }, { key: 'SH', label: 'SH' }, { key: 'GDP', label: 'GDP' },
@@ -962,7 +962,7 @@ const COUNTING_STATS = new Set([
   'Strikes','RS','IFH','BU','BUH','SD','MD','WPA','-WPA','+WPA',
   'Starting','Start-IP','Relieving','Relief-IP','RAR','WAR',
   // Batting counting stats
-  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords',
+  'AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','XBH','TOB','Swords',
 ]);
 
 function aggregateByTeam(players) {
@@ -1473,6 +1473,7 @@ async function generate() {
       p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
       p['SV+HLD+W'] = (p.SV || 0) + (p.HLD || 0) + (p.W || 0);
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
+      p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
     }
     if (isHitting) addSSEAGER(currentData);
@@ -1506,6 +1507,7 @@ async function generate() {
               p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
               p['SV+HLD+W'] = (p.SV || 0) + (p.HLD || 0) + (p.W || 0);
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
+              p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
             }
             if (isHitting) addSSEAGER(prevPlayers);
