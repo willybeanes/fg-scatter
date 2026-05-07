@@ -239,9 +239,16 @@
     .player-dot {
       position: absolute;
       border-radius: 50%;
+      overflow: hidden;
       cursor: pointer;
       transition: transform 0.15s ease, z-index 0s;
       z-index: 3;
+    }
+    .dot-ring {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 2;
     }
     .player-dot:hover {
       transform: scale(2.5);
@@ -1967,9 +1974,16 @@ function rerenderLayout() {
           circle.style.cssText = `position:absolute;inset:${inset}px;border-radius:50%;background:${ringColor(t)};opacity:0.4;z-index:-1;`;
           dot.appendChild(circle);
         } else {
-          // Player headshots: colored ring via box-shadow
+          // Player headshots: colored ring as a sibling div (box-shadow clips in html2canvas)
           const ringW = Math.max(2, Math.round(dotSize * 0.09));
-          dot.style.boxShadow = `0 0 0 ${ringW}px ${ringColor(t)}`;
+          const ring = document.createElement('div');
+          ring.className = 'dot-ring';
+          ring.style.width  = (dotSize + ringW * 2) + 'px';
+          ring.style.height = (dotSize + ringW * 2) + 'px';
+          ring.style.left   = (left - ringW) + 'px';
+          ring.style.top    = (top  - ringW) + 'px';
+          ring.style.border = `${ringW}px solid ${ringColor(t)}`;
+          plotArea.appendChild(ring);
         }
       }
     }
