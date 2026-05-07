@@ -2170,18 +2170,25 @@ async function exportPNG() {
   btnPng.textContent = 'Rendering…';
   btnPng.disabled = true;
 
-  // html2canvas doesn't apply parent overflow:hidden+border-radius to child imgs.
-  // Temporarily stamp clip-path:circle directly on each headshot so they export as circles.
-  // This is export-only — the live site is untouched.
-  const dotImgs = [...chartCard.querySelectorAll('.player-dot img')];
-  dotImgs.forEach(img => { img.style.clipPath = 'circle(50% at 50% 50%)'; });
-
   try {
     const canvas = await html2canvas(chartCard, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
+      // html2canvas doesn't apply parent overflow:hidden+border-radius to child imgs.
+      // In the cloned DOM (never touches the live site), swap each headshot img for a
+      // background-image on the dot div itself — border-radius clips bg-images correctly.
+      onclone: (_doc, el) => {
+        el.querySelectorAll('.player-dot').forEach(dot => {
+          const img = dot.querySelector('img');
+          if (!img) return;
+          dot.style.backgroundImage = `url("${img.src}")`;
+          dot.style.backgroundSize  = 'cover';
+          dot.style.backgroundPosition = 'center';
+          img.style.display = 'none';
+        });
+      },
     });
     const xLabel  = (currentXKey || 'x').replace(/[^a-zA-Z0-9%+\-]/g, '_');
     const yLabel  = (currentYKey || 'y').replace(/[^a-zA-Z0-9%+\-]/g, '_');
@@ -2193,7 +2200,6 @@ async function exportPNG() {
   } catch (e) {
     console.error('PNG export failed:', e);
   } finally {
-    dotImgs.forEach(img => { img.style.clipPath = ''; });
     btnPng.textContent = origLabel;
     btnPng.disabled    = false;
   }
