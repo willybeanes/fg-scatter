@@ -2170,6 +2170,12 @@ async function exportPNG() {
   btnPng.textContent = 'Rendering…';
   btnPng.disabled = true;
 
+  // html2canvas doesn't apply parent overflow:hidden+border-radius to child imgs.
+  // Temporarily stamp clip-path:circle directly on each headshot so they export as circles.
+  // This is export-only — the live site is untouched.
+  const dotImgs = [...chartCard.querySelectorAll('.player-dot img')];
+  dotImgs.forEach(img => { img.style.clipPath = 'circle(50% at 50% 50%)'; });
+
   try {
     const canvas = await html2canvas(chartCard, {
       scale: 2,
@@ -2187,6 +2193,7 @@ async function exportPNG() {
   } catch (e) {
     console.error('PNG export failed:', e);
   } finally {
+    dotImgs.forEach(img => { img.style.clipPath = ''; });
     btnPng.textContent = origLabel;
     btnPng.disabled    = false;
   }
