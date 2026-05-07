@@ -1134,7 +1134,7 @@ function switchMode(mode) {
   populateAxisDropdowns();
   if (mode === 'combined') { selX.value = 'hit_wRC+'; selY.value = 'pit_ERA'; }
   else if (mode === 'hitting') { selX.value = 'wRC+'; selY.value = 'WAR'; }
-  else { selX.value = 'SwStr%'; selY.value = 'ERA'; }
+  else { selX.value = 'SIERA'; selY.value = 'ERA'; }
   // Hide/show controls based on mode
   const hiddenInCombined = [selStats, selHand, selQual, selTeam, selGroup].map(el => el.closest('.control-group'));
   hiddenInCombined.forEach(cg => cg.style.display = isCombined ? 'none' : '');
@@ -1185,7 +1185,7 @@ function switchMode(mode) {
   selSeason.value = new Date().getFullYear();
   selSeason.addEventListener('change', updateSplitAvailability);
   populateAxisDropdowns();
-  selX.value = 'SwStr%';
+  selX.value = 'SIERA';
   selY.value = 'ERA';
   btnGenerate.addEventListener('click', generate);
   // Tab click handlers
