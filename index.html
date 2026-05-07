@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FanGraphs Scatter Plot</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚾</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -465,7 +466,10 @@
         <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
         <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
       </div>
-      <button id="btn-download" style="display:none;font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
+      <div id="export-btns" style="display:none;display:flex;gap:6px;">
+        <button id="btn-download" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
+        <button id="btn-png" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Export PNG</button>
+      </div>
     </div>
   </div>
   <div class="tooltip" id="tooltip">
@@ -1052,7 +1056,9 @@ const axisLabelY = document.getElementById('axis-label-y');
 const selSplit = document.getElementById('sel-split');
 const btnReset = document.getElementById('btn-reset');
 const btnDownload = document.getElementById('btn-download');
-const sizeToggle = document.getElementById('size-toggle');
+const btnPng      = document.getElementById('btn-png');
+const exportBtns  = document.getElementById('export-btns');
+const sizeToggle  = document.getElementById('size-toggle');
 
 // Size toggle buttons
 function syncUrlExtras() {
@@ -1182,7 +1188,7 @@ function switchMode(mode) {
   chartStatus.style.display = 'flex';
   hiddenKeys.clear();
   btnReset.style.display = 'none';
-  btnDownload.style.display = 'none';
+  exportBtns.style.display = 'none';
   sizeToggle.style.display = 'none';
 }
 
@@ -1212,6 +1218,7 @@ function switchMode(mode) {
     rerenderLayout();
   });
   btnDownload.addEventListener('click', downloadCSV);
+  btnPng.addEventListener('click', exportPNG);
 
   // Resize observer
   let resizeTimer;
@@ -1356,7 +1363,7 @@ async function generate() {
   history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
-  btnDownload.style.display = 'none';
+  exportBtns.style.display = 'none';
   sizeToggle.style.display = 'none';
   chartStatus.textContent = 'Loading...';
   chartStatus.classList.remove('error');
@@ -1651,7 +1658,7 @@ async function generate() {
     currentYKey = selY.value;
     currentColorKey = selColor.value;
     chartStatus.style.display = 'none';
-    btnDownload.style.display = 'block';
+    exportBtns.style.display = 'flex';
     sizeToggle.style.display = 'flex';
     rerenderLayout();
   } catch (e) {
@@ -2140,6 +2147,36 @@ function moveTooltip(e) {
 
 function hideTooltip() {
   tooltip.style.display = 'none';
+}
+
+async function exportPNG() {
+  const chartCard = document.querySelector('.chart-card');
+  if (!chartCard) return;
+
+  const origLabel = btnPng.textContent;
+  btnPng.textContent = 'Rendering…';
+  btnPng.disabled = true;
+
+  try {
+    const canvas = await html2canvas(chartCard, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    const xLabel  = (currentXKey || 'x').replace(/[^a-zA-Z0-9%+\-]/g, '_');
+    const yLabel  = (currentYKey || 'y').replace(/[^a-zA-Z0-9%+\-]/g, '_');
+    const season  = selSeason.value || '';
+    const link    = document.createElement('a');
+    link.download = `scatter_${xLabel}_vs_${yLabel}_${season}.png`;
+    link.href     = canvas.toDataURL('image/png');
+    link.click();
+  } catch (e) {
+    console.error('PNG export failed:', e);
+  } finally {
+    btnPng.textContent = origLabel;
+    btnPng.disabled    = false;
+  }
 }
 
 function downloadCSV() {
