@@ -794,11 +794,17 @@ const STAT_GROUPS_PITCHING = [
     { key: 'BB%', label: 'BB%' }, { key: 'K-BB%', label: 'K-BB%' }, { key: 'AVG', label: 'AVG' },
     { key: 'WHIP', label: 'WHIP' }, { key: 'BABIP', label: 'BABIP' }, { key: 'LOB%', label: 'LOB%' },
     { key: 'HR/FB', label: 'HR/FB' }, { key: 'TTO%', label: 'TTO%' },
+    { key: 'wOBA', label: 'wOBA' },
   ]},
   { group: 'Batted Ball', stats: [
     { key: 'GB/FB', label: 'GB/FB' }, { key: 'GB%', label: 'GB%' }, { key: 'FB%', label: 'FB%' },
     { key: 'LD%', label: 'LD%' }, { key: 'IFFB%', label: 'IFFB%' },
     { key: 'IFH%', label: 'IFH%' }, { key: 'BUH%', label: 'BUH%' },
+  ]},
+  { group: 'Quality of Contact (Against)', stats: [
+    { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
+    { key: 'Barrel%', label: 'Barrel%' }, { key: 'HardHit%', label: 'HardHit%' },
+    { key: 'EV', label: 'EV' }, { key: 'maxEV', label: 'maxEV' },
   ]},
   { group: 'Win Probability', stats: [
     { key: 'WPA', label: 'WPA' }, { key: '-WPA', label: '-WPA' }, { key: '+WPA', label: '+WPA' },
@@ -1613,13 +1619,13 @@ async function generate() {
           pitNeedsExp ? fetchSavantLeaderboard('pitcher-team', 'expected_statistics', season) : null,
         ].map(p => p instanceof Promise ? p : Promise.resolve(p)));
         if (hitSC || hitExp) currentData = applySavantRows(currentData, { search: null, statcast: hitSC, expected: hitExp }, true, 'hit_', new Set(['xERA']));
-        if (pitSC || pitExp) currentData = applySavantRows(currentData, { search: null, statcast: pitSC, expected: pitExp }, true, 'pit_', new Set(['xwOBA','xSLG']));
+        if (pitSC || pitExp) currentData = applySavantRows(currentData, { search: null, statcast: pitSC, expected: pitExp }, true, 'pit_', new Set());
 
       } else if (needsAnySavant) {
         const playerType = isHitting ? 'batter' : 'pitcher';
         const lbType     = playerType + (isTeam ? '-team' : '');
         const srchGroup  = isTeam ? 'team' : 'name';
-        const skipKeys   = isHitting ? new Set(['xERA']) : new Set(['xwOBA','xSLG']);
+        const skipKeys   = isHitting ? new Set(['xERA']) : new Set();
 
         const [srchRows, scRows, expRows, btRows, customRows] = await Promise.all([
           // statcast_search: one call covers all searchCol stats for any date range
@@ -2065,7 +2071,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','K-BB%','HR/FB']);
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','K-BB%','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','HardHit%','EV','maxEV']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS']);
 
 function lowerIsBetter(key) {
