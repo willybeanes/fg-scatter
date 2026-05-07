@@ -2183,8 +2183,10 @@ async function exportPNG() {
         el.querySelectorAll('.player-dot').forEach(dot => {
           const img = dot.querySelector('img');
           if (!img) return;
-          dot.style.backgroundImage = `url("${img.src}")`;
-          dot.style.backgroundSize  = 'cover';
+          // Use a higher-res version of the image (w_60 → w_200) to avoid fuzz at 2× export scale
+          const hiResSrc = img.src.replace(/\/w_\d+/, '/w_200');
+          dot.style.backgroundImage    = `url("${hiResSrc}")`;
+          dot.style.backgroundSize     = 'cover';
           dot.style.backgroundPosition = 'center';
           img.style.display = 'none';
         });
