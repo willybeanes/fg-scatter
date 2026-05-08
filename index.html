@@ -334,6 +334,7 @@
             <option value="0">Full Season</option>
             <option value="32">Last 7 Days</option>
             <option value="33">Last 14 Days</option>
+            <option value="35">Last 21 Days</option>
             <option value="34">Last 30 Days</option>
             <option value="35">First Half</option>
             <option value="36">Second Half</option>
@@ -585,6 +586,7 @@ function getSavantDateRange(month, season) {
     case '36': return { dateGt: `${yr}-07-15`, dateLt: `${yr}-11-01` }; // Second Half
     case '32': return { dateGt: daysAgo(7),  dateLt: tomorrow() };      // Last 7 days
     case '33': return { dateGt: daysAgo(14), dateLt: tomorrow() };      // Last 14 days
+    case '35': return { dateGt: daysAgo(21), dateLt: tomorrow() };      // Last 21 days
     case '34': return { dateGt: daysAgo(30), dateLt: tomorrow() };      // Last 30 days
     default:   return null;
   }
@@ -602,6 +604,7 @@ function getFGSplitParams(splitValue, season) {
     case '31': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-05-01` }; // Mar/Apr
     case '32': return { month: '1000', startdate: daysAgo(7),   enddate: today };           // Last 7 days
     case '33': return { month: '1000', startdate: daysAgo(14),  enddate: today };           // Last 14 days
+    case '35': return { month: '1000', startdate: daysAgo(21),  enddate: today };           // Last 21 days
     case '34': return { month: '1000', startdate: daysAgo(30),  enddate: today };           // Last 30 days
     case '35': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-07-12` }; // First Half
     case '36': return { month: '1000', startdate: `${yr}-07-12`, enddate: `${yr}-11-01` }; // Second Half
