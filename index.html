@@ -313,6 +313,26 @@
       .controls-row { gap: 10px; }
       .control-group select, .control-group input[type="number"] { min-width: 100px; font-size: 12px; }
     }
+    .split-warning {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff8ed;
+      color: #7a4f00;
+      border: 1px solid #f5c97a;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+      z-index: 9999;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    .split-warning.visible { opacity: 1; }
   </style>
 </head>
 <body>
@@ -479,6 +499,7 @@
       </div>
     </div>
   </div>
+  <div class="split-warning" id="split-warning"></div>
   <div class="tooltip" id="tooltip">
     <div class="tooltip-name" id="tt-name"></div>
     <div class="tooltip-meta" id="tt-meta"></div>
@@ -1027,6 +1048,17 @@ function aggregateByTeam(players) {
 
 // State
 let currentData = null;
+
+// Toast warning for split-incompatible stats
+const splitWarningEl = document.getElementById('split-warning');
+let splitWarningTimer = null;
+function showSplitWarning(statNames) {
+  const plural = statNames.length > 1;
+  splitWarningEl.textContent = `⚠ ${statNames.join(' & ')} ${plural ? 'show' : 'shows'} full-season data only — splits aren't supported for ${plural ? 'these metrics' : 'this metric'}.`;
+  splitWarningEl.classList.add('visible');
+  clearTimeout(splitWarningTimer);
+  splitWarningTimer = setTimeout(() => splitWarningEl.classList.remove('visible'), 4500);
+}
 let currentXKey = null;
 let currentYKey = null;
 let currentGroupBy = 'player';
@@ -1597,6 +1629,23 @@ async function generate() {
       // Combined mode always uses leaderboard (no split controls shown)
       const dateRange = isCombined ? null : getSavantDateRange(selSplit.value, season);
       const useSearch = dateRange !== null;
+
+      // Warn if a split is active but any axis stat can't support splits (no searchCol)
+      if (useSearch) {
+        const optionLabel = key => {
+          for (const sel of [selX, selY, selColor]) {
+            const opt = [...sel.options].find(o => o.value === key);
+            if (opt) return opt.text;
+          }
+          return key;
+        };
+        const incompatibleKeys = [...new Set(
+          axisKeys
+            .map(k => baseKey(k))
+            .filter(k => SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom'))
+        )];
+        if (incompatibleKeys.length) showSplitWarning(incompatibleKeys.map(optionLabel));
+      }
 
       // Helper: does any axis need a particular leaderboard endpoint?
       const needsLbEp = ep => axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === ep);
