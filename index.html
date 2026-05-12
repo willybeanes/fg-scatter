@@ -2300,7 +2300,7 @@ function downloadCSV() {
   const isPrevYear = currentYKey === '__prev_year__';
   const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
   headers.push(xLabel, yLabel);
-  if (isPrevYear) headers.push('Δ');
+  if (isPrevYear) headers.push('Delta');
   if (colorLabel) headers.push(colorLabel);
 
   // Data rows — only include rows with valid x and y values
@@ -2317,7 +2317,7 @@ function downloadCSV() {
       const xDv = displayVal(xv, currentXKey);
       const pyDv = displayVal(yv, currentYKey);
       const delta = xDv - pyDv;
-      const sign = delta > 0 ? '+' : delta < 0 ? '−' : '';
+      const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
       cols.push(sign + formatStat(Math.abs(delta), currentXKey));
     }
     if (colorLabel) {
@@ -2328,7 +2328,7 @@ function downloadCSV() {
   }
 
   const split = selSplit.options[selSplit.selectedIndex].text.replace(/\s+/g, '-');
-  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
