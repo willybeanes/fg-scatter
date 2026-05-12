@@ -2153,8 +2153,13 @@ const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS']);
 function lowerIsBetter(key) {
   const bk = baseKey(key);
   if (LOWER_IS_BETTER_ALWAYS.has(bk)) return true;
-  if (currentMode !== 'hitting' && LOWER_IS_BETTER_PITCHING.has(bk)) return true;
-  if (currentMode === 'hitting'  && LOWER_IS_BETTER_HITTING.has(bk))  return true;
+  // In combined mode, use the key prefix (hit_/pit_) to determine context
+  // so that e.g. hit_wOBA (higher=better for hitters) and pit_wOBA (lower=better for pitchers)
+  // are handled correctly rather than both being treated as pitcher context.
+  const isPitcher = currentMode === 'pitching' || (currentMode === 'combined' && key.startsWith('pit_'));
+  const isHitter  = currentMode === 'hitting'  || (currentMode === 'combined' && key.startsWith('hit_'));
+  if (isPitcher && LOWER_IS_BETTER_PITCHING.has(bk)) return true;
+  if (isHitter  && LOWER_IS_BETTER_HITTING.has(bk))  return true;
   return false;
 }
 
