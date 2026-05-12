@@ -1574,13 +1574,9 @@ async function generate() {
                 const lbType = (isHitting ? 'batter' : 'pitcher') + (isTeam ? '-team' : '');
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
                 if (savantDetail.leaderEp === 'bat_tracking') {
-                  // Use the bat-tracking leaderboard for prev year — same source as current year,
-                  // so values match the official leaderboard rather than statcast_search aggregations.
-                  if (savantDetail.leaderCol) {
-                    const btRows = await fetchSavantBatTracking(prevSeason);
-                    prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: null, expected: null, batTracking: btRows }, isTeam, '', skipKeys, false);
-                  } else if (savantDetail.searchCol) {
-                    // Search-only stats (AttackAngle, AttackDir, SwingTilt) have no leaderCol — fall back to search
+                  // The bat-tracking leaderboard API ignores the seasons param and always returns
+                  // the current season — so we must use statcast_search to get the correct prior year.
+                  if (savantDetail.searchCol) {
                     const srchGroup = isTeam ? 'team' : 'name';
                     const srchRows = await fetchSavantSearch('batter', srchGroup, prevSeason, null);
                     prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, isTeam, '', skipKeys, true);
