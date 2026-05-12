@@ -2193,9 +2193,24 @@ function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   }
   const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
   const colorVal = colorLabel != null ? displayVal(player[currentColorKey], currentColorKey) : null;
+  // Delta row for prev-year comparisons
+  let deltaHtml = '';
+  if (yKey === '__prev_year__') {
+    const xDv  = displayVal(player[xKey], xKey);
+    const pyDv = displayVal(player['__prev_year__'], '__prev_year__');
+    if (xDv != null && isFinite(xDv) && pyDv != null && isFinite(pyDv)) {
+      const delta = xDv - pyDv;
+      const improving = lowerIsBetter(xKey) ? delta < 0 : delta > 0;
+      const deltaColor = delta === 0 ? '#999' : (improving ? '#2e9e6b' : '#d04040');
+      const sign = delta > 0 ? '+' : delta < 0 ? '−' : '';
+      const deltaStr = sign + formatStat(Math.abs(delta), xKey);
+      deltaHtml = `<div class="tooltip-stat"><span class="tooltip-stat-label">Δ</span><span class="tooltip-stat-value" style="color:${deltaColor}">${deltaStr}</span></div>`;
+    }
+  }
   ttStats.innerHTML = `
     <div class="tooltip-stat"><span class="tooltip-stat-label">${xLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[xKey], xKey), xKey)}</span></div>
     <div class="tooltip-stat"><span class="tooltip-stat-label">${yLabel}</span><span class="tooltip-stat-value">${formatStat(displayVal(player[yKey], yKey), yKey)}</span></div>
+    ${deltaHtml}
     ${colorLabel != null && colorVal != null && isFinite(colorVal) ? `<div class="tooltip-stat"><span class="tooltip-stat-label">${colorLabel}</span><span class="tooltip-stat-value">${formatStat(colorVal, currentColorKey)}</span></div>` : ''}
   `;
   tooltip.style.display = 'block';
@@ -2282,8 +2297,10 @@ function downloadCSV() {
   const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
 
   // Header row
+  const isPrevYear = currentYKey === '__prev_year__';
   const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
   headers.push(xLabel, yLabel);
+  if (isPrevYear) headers.push('Δ');
   if (colorLabel) headers.push(colorLabel);
 
   // Data rows — only include rows with valid x and y values
@@ -2296,6 +2313,13 @@ function downloadCSV() {
     cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
     cols.push(formatStat(displayVal(xv, currentXKey), currentXKey));
     cols.push(formatStat(displayVal(yv, currentYKey), currentYKey));
+    if (isPrevYear) {
+      const xDv = displayVal(xv, currentXKey);
+      const pyDv = displayVal(yv, currentYKey);
+      const delta = xDv - pyDv;
+      const sign = delta > 0 ? '+' : delta < 0 ? '−' : '';
+      cols.push(sign + formatStat(Math.abs(delta), currentXKey));
+    }
     if (colorLabel) {
       const cv = p[currentColorKey];
       cols.push(cv != null && isFinite(cv) ? formatStat(displayVal(cv, currentColorKey), currentColorKey) : '');
