@@ -718,12 +718,13 @@ async function fetchSavantSearch(playerType, groupBy, season, dateRange) {
   return parseCSV(text);
 }
 
-// Fetch Baseball Savant bat-tracking leaderboard CSV (full season only — no date-range splits)
+// Fetch Baseball Savant bat-tracking leaderboard CSV
 async function fetchSavantBatTracking(season) {
   const params = new URLSearchParams({
     path: '/leaderboard/bat-tracking',
-    attackZone: '', batSide: '', contactType: '',
-    seasons: season, team: '', csv: 'true'
+    gameType: 'Regular', minSwings: 'q', minGroupSwings: '1',
+    seasonStart: season, seasonEnd: season, type: 'batter',
+    team: '', csv: 'true'
   });
   const resp = await fetch(`${SAVANT_PROXY}?${params}`);
   if (!resp.ok) throw new Error(`Savant bat tracking HTTP ${resp.status}`);
@@ -1574,9 +1575,12 @@ async function generate() {
                 const lbType = (isHitting ? 'batter' : 'pitcher') + (isTeam ? '-team' : '');
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
                 if (savantDetail.leaderEp === 'bat_tracking') {
-                  // The bat-tracking leaderboard API ignores the seasons param and always returns
-                  // the current season — so we must use statcast_search to get the correct prior year.
-                  if (savantDetail.searchCol) {
+                  if (savantDetail.leaderCol) {
+                    // Use leaderboard with seasonStart/seasonEnd for correct prior-year values
+                    const btRows = await fetchSavantBatTracking(prevSeason);
+                    prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: null, expected: null, batTracking: btRows }, isTeam, '', skipKeys, false);
+                  } else if (savantDetail.searchCol) {
+                    // Search-only stats (AttackAngle, AttackDir, SwingTilt) — no leaderboard column
                     const srchGroup = isTeam ? 'team' : 'name';
                     const srchRows = await fetchSavantSearch('batter', srchGroup, prevSeason, null);
                     prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, isTeam, '', skipKeys, true);
