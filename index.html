@@ -884,7 +884,7 @@ const STAT_GROUPS_HITTING = [
   { group: 'Summary', stats: [
     { key: 'Age', label: 'Age' }, { key: 'AVG', label: 'AVG' }, { key: 'OBP', label: 'OBP' },
     { key: 'SLG', label: 'SLG' }, { key: 'OPS', label: 'OPS' }, { key: 'ISO', label: 'ISO' },
-    { key: 'wOBA', label: 'wOBA' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' }, { key: 'wRC+', label: 'wRC+' },
+    { key: 'wOBA', label: 'wOBA' }, { key: 'wOBACON', label: 'wOBACON' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' }, { key: 'wRC+', label: 'wRC+' },
     { key: 'WAR', label: 'WAR' }, { key: 'RAR', label: 'RAR' },
     { key: 'Batting', label: 'Batting' }, { key: 'Offense', label: 'Offense' },
   ]},
@@ -1530,6 +1530,13 @@ async function generate() {
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
       p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
+      // wOBACON = wOBA restricted to contact (no BB/HBP in numerator or denominator)
+      // Weights from FanGraphs Guts (2024): 1B=0.882, 2B=1.254, 3B=1.590, HR=2.050
+      // Denominator: AB - SO + SF  (balls put in play incl. HR and sac flies)
+      const _wOBACON_d = (p.AB || 0) - (p.SO || 0) + (p.SF || 0);
+      p['wOBACON'] = _wOBACON_d > 0
+        ? (0.882*(p['1B']||0) + 1.254*(p['2B']||0) + 1.590*(p['3B']||0) + 2.050*(p.HR||0)) / _wOBACON_d
+        : null;
     }
     if (isHitting) addSSEAGER(currentData);
 
@@ -1564,6 +1571,10 @@ async function generate() {
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
               p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
+              const _wOBACON_d = (p.AB || 0) - (p.SO || 0) + (p.SF || 0);
+              p['wOBACON'] = _wOBACON_d > 0
+                ? (0.882*(p['1B']||0) + 1.254*(p['2B']||0) + 1.590*(p['3B']||0) + 2.050*(p.HR||0)) / _wOBACON_d
+                : null;
             }
             if (isHitting) addSSEAGER(prevPlayers);
 
@@ -2164,7 +2175,7 @@ function lowerIsBetter(key) {
 }
 
 // Stats displayed as .xxx (batting average format)
-const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','xwOBA','xSLG','xwOBACON','sSEAGER','BABIP']);
+const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','wOBACON','xwOBA','xSLG','xwOBACON','sSEAGER','BABIP']);
 
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
