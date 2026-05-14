@@ -838,7 +838,7 @@ const STAT_GROUPS_PITCHING = [
   ]},
   { group: 'Quality of Contact (Against)', stats: [
     { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
-    { key: 'Barrel%', label: 'Barrel%' }, { key: 'HardHit%', label: 'HardHit%' },
+    { key: 'Barrel%', label: 'Barrel%' }, { key: 'Barrels', label: 'Barrels' }, { key: 'HardHit%', label: 'HardHit%' },
     { key: 'EV', label: 'EV' }, { key: 'maxEV', label: 'maxEV' },
   ]},
   { group: 'Win Probability', stats: [
@@ -927,7 +927,7 @@ const STAT_GROUPS_HITTING = [
   ]},
   { group: 'Batted Ball Quality', stats: [
     { key: 'EV', label: 'EV' }, { key: 'EV50', label: 'EV50' }, { key: 'LA', label: 'LA' },
-    { key: 'Barrel%', label: 'Barrel%' }, { key: 'HardHit%', label: 'HardHit%' },
+    { key: 'Barrel%', label: 'Barrel%' }, { key: 'Barrels', label: 'Barrels' }, { key: 'HardHit%', label: 'HardHit%' },
     { key: 'maxEV', label: 'maxEV' },
   ]},
   { group: 'Bat Tracking', stats: [
@@ -2108,7 +2108,7 @@ function baseKey(key) {
 }
 
 // Counting stats where a null API response means 0, not "no data"
-const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords']);
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords','Barrels','HardHit']);
 
 function displayVal(val, key) {
   // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
@@ -2147,7 +2147,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','HardHit%','EV','maxEV']);
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','Barrels','HardHit%','HardHit','EV','maxEV']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS']);
 
 function lowerIsBetter(key) {
