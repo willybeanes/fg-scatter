@@ -841,7 +841,9 @@ const STAT_GROUPS_PITCHING = [
   ]},
   { group: 'Quality of Contact (Against)', stats: [
     { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
-    { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' }, { key: 'HardHit%', label: 'HardHit%' },
+    { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' },
+    { key: 'aBarrel%', label: 'aBarrel/BBE%' }, { key: 'aBarrelPA%', label: 'aBarrel/PA%' }, { key: 'aBarrels', label: 'aBarrels' },
+    { key: 'HardHit%', label: 'HardHit%' },
     { key: 'EV', label: 'EV' }, { key: 'maxEV', label: 'maxEV' },
   ]},
   { group: 'Win Probability', stats: [
@@ -930,7 +932,9 @@ const STAT_GROUPS_HITTING = [
   ]},
   { group: 'Batted Ball Quality', stats: [
     { key: 'EV', label: 'EV' }, { key: 'EV50', label: 'EV50' }, { key: 'LA', label: 'LA' },
-    { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' }, { key: 'HardHit%', label: 'HardHit%' },
+    { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' },
+    { key: 'aBarrel%', label: 'aBarrel/BBE%' }, { key: 'aBarrelPA%', label: 'aBarrel/PA%' }, { key: 'aBarrels', label: 'aBarrels' },
+    { key: 'HardHit%', label: 'HardHit%' },
     { key: 'maxEV', label: 'maxEV' },
   ]},
   { group: 'Bat Tracking', stats: [
@@ -1388,6 +1392,41 @@ function addSSEAGER(players) {
   }
 }
 
+// ── Adjusted Barrel (aBarrel) data ──────────────────────────────────────────
+// Public Google Sheets companion dataset maintained by @collinmyshot.
+// Columns: Player, PA, BBE, Barrels, aBarrels, Brl/BBE%, aBrl/BBE%, ..., aBrl/PA%
+const ABARREL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/16WxkFwZYKcurMM0CJJr4l5mo1S6rs-yKnnr1ZfmoGjU/export?format=csv';
+const ABARREL_KEYS = new Set(['aBarrels', 'aBarrel%', 'aBarrelPA%']);
+let _aBarrelCache = null; // single cached fetch (full-season snapshot, no year param)
+
+function _normName(name) {
+  // Normalize to lowercase ASCII for fuzzy name matching
+  return (name || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, '').trim();
+}
+
+async function fetchABarrelData() {
+  if (_aBarrelCache) return _aBarrelCache;
+  const resp = await fetch(ABARREL_SHEET_URL);
+  const text = await resp.text();
+  const lines = text.replace(/^﻿/, '').trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const map = new Map();
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    const row = {};
+    headers.forEach((h, j) => { row[h] = (cols[j] || '').trim(); });
+    const name = _normName(row['Player']);
+    if (!name) continue;
+    map.set(name, {
+      aBarrels:    parseFloat(row['aBarrels'])    || null,
+      aBarrelBBE:  parseFloat(row['aBrl/BBE%'])  != null ? parseFloat(row['aBrl/BBE%'])  / 100 : null,
+      aBarrelPA:   parseFloat(row['aBrl/PA%'])   != null ? parseFloat(row['aBrl/PA%'])   / 100 : null,
+    });
+  }
+  _aBarrelCache = map;
+  return map;
+}
+
 // Cache rookie player ID sets by "season:stats" key.
 // Fetches with ind=2 (full-season, no split) and caches the Set<playerid>.
 const _rookieIdCache = new Map();
@@ -1708,7 +1747,7 @@ async function generate() {
         const incompatibleKeys = [...new Set(
           axisKeys
             .map(k => baseKey(k))
-            .filter(k => SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom'))
+            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom')))
         )];
         if (incompatibleKeys.length) showSplitWarning(incompatibleKeys.map(optionLabel));
       }
@@ -1782,6 +1821,23 @@ async function generate() {
     for (const p of currentData) {
       // Barrel/PA% — stored as 0-1 fraction (like other PCT_KEYS) so displayVal ×100 works correctly
       p['BarrelPA%'] = (p.PA || 0) > 0 ? (p.Barrels || 0) / (p.PA || 0) : null;
+    }
+
+    // Adjusted Barrel enrichment — fetched from @collinmyshot's public Google Sheet,
+    // matched to currentData by normalized player name.
+    if (!isTeam && axisKeys.some(k => ABARREL_KEYS.has(baseKey(k)))) {
+      try {
+        const aBarrelMap = await fetchABarrelData();
+        for (const p of currentData) {
+          const key = _normName(p.PlayerName || p.Name || '');
+          const ab = aBarrelMap.get(key);
+          p['aBarrels']    = ab?.aBarrels   ?? null;
+          p['aBarrel%']    = ab?.aBarrelBBE ?? null;
+          p['aBarrelPA%']  = ab?.aBarrelPA  ?? null;
+        }
+      } catch (aBarrelErr) {
+        console.warn('aBarrel fetch failed:', aBarrelErr.message);
+      }
     }
 
     currentXKey = selX.value;
@@ -2163,7 +2219,7 @@ const PCT_KEYS = new Set([
   'pfxKC%','pfxEP%','pfxCH%','pfxSC%','pfxKN%','pfxUN%',
   // Batting-specific percentages
   'Pull%','Cent%','Oppo%','Soft%','Med%','Hard%',
-  'Barrel%','BarrelPA%','HardHit%',
+  'Barrel%','BarrelPA%','aBarrel%','aBarrelPA%','HardHit%',
   // Bat tracking rates (stored as fractions 0–1)
   'FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw',
 ]);
@@ -2176,7 +2232,7 @@ function baseKey(key) {
 }
 
 // Counting stats where a null API response means 0, not "no data"
-const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords','Barrels','HardHit']);
+const COUNTING_KEYS = new Set(['W','L','G','GS','CG','ShO','SV','HLD','SV+HLD','SV+HLD+W','BS','TBF','H','R','ER','HR','BB','IBB','HBP','WP','BK','SO','GB','FB','LD','IFFB','Pitches','Balls','Strikes','RS','IFH','BU','BUH','SD','MD','AB','PA','1B','2B','3B','RBI','SF','SH','GDP','SB','CS','SB+CS','TOB','Swords','Barrels','HardHit','aBarrels']);
 
 function displayVal(val, key) {
   // FanGraphs sometimes returns null for counting stats (e.g. HLD) instead of 0.
@@ -2215,7 +2271,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV']);
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','aBarrel%','aBarrelPA%','aBarrels','HardHit%','HardHit','EV','maxEV']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS']);
 
 function lowerIsBetter(key) {
