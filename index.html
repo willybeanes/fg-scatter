@@ -473,6 +473,9 @@
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:500;color:#555;white-space:nowrap;">
               <input type="checkbox" id="chk-r2" style="cursor:pointer;accent-color:#1a1a1a;width:14px;height:14px;"> R² line
             </label>
+            <label id="lbl-rookie" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:500;color:#555;white-space:nowrap;">
+              <input type="checkbox" id="chk-rookie" style="cursor:pointer;accent-color:#1a1a1a;width:14px;height:14px;"> Rookies only
+            </label>
           </div>
         </div>
       </div>
@@ -1084,7 +1087,9 @@ const selGroup = document.getElementById('sel-group');
 const selX = document.getElementById('sel-x');
 const selY = document.getElementById('sel-y');
 const selColor = document.getElementById('sel-color');
-const chkR2 = document.getElementById('chk-r2');
+const chkR2    = document.getElementById('chk-r2');
+const chkRookie = document.getElementById('chk-rookie');
+const lblRookie = document.getElementById('lbl-rookie');
 const btnGenerate = document.getElementById('btn-generate');
 const chartStatus = document.getElementById('chart-status');
 const chartArea = document.getElementById('chart-area');
@@ -1107,6 +1112,7 @@ function syncUrlExtras() {
   const urlP = new URLSearchParams(window.location.search);
   urlP.set('size', currentDotScale);
   if (chkR2.checked) urlP.set('r2', '1'); else urlP.delete('r2');
+  if (chkRookie.checked) urlP.set('rookie', '1'); else urlP.delete('rookie');
   history.replaceState(null, '', '?' + urlP.toString());
 }
 
@@ -1125,6 +1131,7 @@ document.querySelectorAll('.size-btn').forEach(btn => {
 });
 
 chkR2.addEventListener('change', () => { if (currentData) rerenderLayout(); syncUrlExtras(); });
+chkRookie.addEventListener('change', () => { syncUrlExtras(); generate(); });
 
 const PITCHING_TYPE_OPTIONS = [
   { value: 'pit', label: 'All Pitchers' },
@@ -1301,6 +1308,7 @@ function switchMode(mode) {
     }
   }
   if (urlP.get('r2') === '1') chkR2.checked = true;
+  if (urlP.get('rookie') === '1') chkRookie.checked = true;
   updateSplitAvailability();
   if (urlP.has('season') || urlP.has('x') || urlP.has('y')) generate();
 
@@ -1387,6 +1395,13 @@ async function generate() {
   const isHitting = currentMode === 'hitting';
   currentPrevYearSeason = null; // reset each run
 
+  // Rookie filter: ind=2 for rookies-only, ind=0 for all players.
+  // Not applicable to team/combined mode — disable the checkbox there.
+  const rookieAvailable = !isTeam;
+  lblRookie.style.opacity = rookieAvailable ? '' : '0.4';
+  chkRookie.disabled = !rookieAvailable;
+  const indParam = (rookieAvailable && chkRookie.checked) ? '2' : '0';
+
   // Update URL with current state
   const urlState = new URLSearchParams({ mode: currentMode, season, split: selSplit.value });
   if (!isCombined) {
@@ -1402,6 +1417,7 @@ async function generate() {
   if (selColor.value !== 'none') urlState.set('color', selColor.value);
   urlState.set('size', currentDotScale);
   if (chkR2.checked) urlState.set('r2', '1');
+  if (chkRookie.checked) urlState.set('rookie', '1');
   history.replaceState(null, '', '?' + urlState.toString());
 
   btnGenerate.disabled = true;
@@ -1420,7 +1436,7 @@ async function generate() {
   try {
     if (isCombined) {
       // Fetch team-level batting and pitching data in parallel using team=0,ts
-      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, ...getFGSplitParams(selSplit.value, season), ind: '0', hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
+      const baseParams = { pos: 'all', lg: selLg.value, qual: '0', type: '4', season, season1: season, ...getFGSplitParams(selSplit.value, season), ind: indParam, hand: '', team: '0,ts', pageitems: '100', pagenum: '1', sortstat: 'WAR', sortdir: 'default' };
       const [batResp, pitResp] = await Promise.all([
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'bat' })}`),
         fetch(`${PROXY}?${new URLSearchParams({ ...baseParams, stats: 'pit' })}`)
@@ -1462,7 +1478,7 @@ async function generate() {
         qual: '0',
         type: '4',
         season, season1: season,
-        ...getFGSplitParams(selSplit.value, season), ind: '0',
+        ...getFGSplitParams(selSplit.value, season), ind: indParam,
         hand: selHand.value,
         team: teamParam,
         pageitems: '10000', pagenum: '1',
@@ -1499,7 +1515,7 @@ async function generate() {
         qual: effectiveQual,
         type: '4',
         season, season1: season,
-        ...fgSplitParams, ind: '0',
+        ...fgSplitParams, ind: indParam,
         hand: selHand.value,
         team: apiTeam,
         pageitems: '10000', pagenum: '1',
@@ -1552,7 +1568,7 @@ async function generate() {
         qual: prevQual,
         type: '4',
         season: prevSeason, season1: prevSeason,
-        month: '0', ind: '0',
+        month: '0', ind: indParam,
         hand: '', team: isTeam ? '0,ts' : '0',
         pageitems: '10000', pagenum: '1',
         sortstat: 'WAR', sortdir: 'default'
