@@ -1388,6 +1388,24 @@ function addSSEAGER(players) {
   }
 }
 
+// Cache rookie player ID sets by "season:stats" key.
+// Fetches with ind=2 (full-season, no split) and caches the Set<playerid>.
+const _rookieIdCache = new Map();
+async function fetchRookieIds(season, stats) {
+  const key = `${season}:${stats}`;
+  if (_rookieIdCache.has(key)) return _rookieIdCache.get(key);
+  const params = new URLSearchParams({
+    pos: 'all', stats, lg: 'all', qual: '0', type: '4',
+    season, season1: season, month: '0', ind: '2',
+    pageitems: '10000', pagenum: '1', sortstat: 'WAR', sortdir: 'default',
+  });
+  const resp = await fetch(`${PROXY}?${params}`);
+  const json = await resp.json();
+  const ids = new Set((json.data || []).map(p => String(p.playerid)));
+  _rookieIdCache.set(key, ids);
+  return ids;
+}
+
 async function generate() {
   const season = selSeason.value;
   const isCombined = currentMode === 'combined';
@@ -1395,12 +1413,14 @@ async function generate() {
   const isHitting = currentMode === 'hitting';
   currentPrevYearSeason = null; // reset each run
 
-  // Rookie filter: ind=2 for rookies-only, ind=0 for all players.
+  // Rookie filter: FanGraphs ind=2 is ignored when split params are active,
+  // so we always fetch all players (ind=0) and filter client-side against a
+  // separately fetched rookie ID set (cached per season+stats).
   // Not applicable to team/combined mode — disable the checkbox there.
   const rookieAvailable = !isTeam;
   lblRookie.style.opacity = rookieAvailable ? '' : '0.4';
   chkRookie.disabled = !rookieAvailable;
-  const indParam = (rookieAvailable && chkRookie.checked) ? '2' : '0';
+  const indParam = '0';
 
   // Update URL with current state
   const urlState = new URLSearchParams({ mode: currentMode, season, split: selSplit.value });
@@ -1537,6 +1557,21 @@ async function generate() {
 
       currentGroupBy = 'player';
       currentData = players;
+    }
+
+    // Rookie filter — fetch a full-season ind=2 ID set and filter client-side
+    // so it works correctly even when splits are active (FG ignores ind=2 with splits).
+    if (rookieAvailable && chkRookie.checked) {
+      try {
+        const statsParam = isHitting ? 'bat' : (selStats.value || 'pit');
+        const rookieIds = await fetchRookieIds(season, statsParam);
+        currentData = currentData.filter(p => rookieIds.has(String(p.playerid)));
+        if (!currentData.length) throw new Error('No rookie data found for these filters');
+      } catch (rookieErr) {
+        if (rookieErr.message.includes('rookie')) throw rookieErr;
+        // Non-fatal: network error fetching rookie list — show all players
+        console.warn('Rookie ID fetch failed:', rookieErr.message);
+      }
     }
 
     // Compute composite stats
