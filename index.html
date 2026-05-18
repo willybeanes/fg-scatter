@@ -722,11 +722,12 @@ async function fetchSavantSearch(playerType, groupBy, season, dateRange) {
 }
 
 // Fetch Baseball Savant bat-tracking leaderboard CSV
-async function fetchSavantBatTracking(season) {
+// type: 'batter' (hitter averages) or 'pitcher' (bat-tracking metrics against a pitcher)
+async function fetchSavantBatTracking(season, type = 'batter') {
   const params = new URLSearchParams({
     path: '/leaderboard/bat-tracking',
     gameType: 'Regular', minSwings: 'q', minGroupSwings: '1',
-    seasonStart: season, seasonEnd: season, type: 'batter',
+    seasonStart: season, seasonEnd: season, type,
     team: '', csv: 'true'
   });
   const resp = await fetch(`${SAVANT_PROXY}?${params}`);
@@ -855,6 +856,16 @@ const STAT_GROUPS_PITCHING = [
     { key: 'Zone%', label: 'Zone%' }, { key: 'F-Strike%', label: 'F-Strike%' },
     { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
     { key: 'C+SwStr%', label: 'CSW%' },
+  ]},
+  { group: 'Bat Tracking (Against)', stats: [
+    { key: 'BatSpeed',   label: 'Bat Speed'   },
+    { key: 'FastSwing%', label: 'Fast Swing%' },
+    { key: 'Blasts/C',  label: 'Blasts/C'    },
+    { key: 'Blasts/Sw', label: 'Blasts/Sw'   },
+    { key: 'SqUp/C',    label: 'Sq-Up/C'     },
+    { key: 'SqUp/Sw',   label: 'Sq-Up/Sw'    },
+    { key: 'SwingLen',  label: 'Swing Len'   },
+    { key: 'Swords',    label: 'Swords'      },
   ]},
   { group: 'Workload', stats: [
     { key: 'Starting', label: 'Starting' }, { key: 'Start-IP', label: 'Start-IP' },
@@ -1675,14 +1686,15 @@ async function generate() {
                 const lbType = (isHitting ? 'batter' : 'pitcher') + (isTeam ? '-team' : '');
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
                 if (savantDetail.leaderEp === 'bat_tracking') {
+                  const btPlayerType = isHitting ? 'batter' : 'pitcher';
                   if (savantDetail.leaderCol) {
                     // Use leaderboard with seasonStart/seasonEnd for correct prior-year values
-                    const btRows = await fetchSavantBatTracking(prevSeason);
+                    const btRows = await fetchSavantBatTracking(prevSeason, btPlayerType);
                     prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: null, expected: null, batTracking: btRows }, isTeam, '', skipKeys, false);
                   } else if (savantDetail.searchCol) {
                     // Search-only stats (AttackAngle, AttackDir, SwingTilt) — no leaderboard column
                     const srchGroup = isTeam ? 'team' : 'name';
-                    const srchRows = await fetchSavantSearch('batter', srchGroup, prevSeason, null);
+                    const srchRows = await fetchSavantSearch(btPlayerType, srchGroup, prevSeason, null);
                     prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, isTeam, '', skipKeys, true);
                   }
                 } else if (savantDetail.leaderEp === 'custom') {
@@ -1764,8 +1776,8 @@ async function generate() {
       const needsSearch = needsBtSearch || (useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.searchCol));
       // Do we still need leaderboard even in search mode?
       const needsLbEvenWithSearch = useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking');
-      // Bat tracking leaderboard: hitters only, full-season (for stats that have a leaderCol)
-      const needsBatTracking = isHitting && !isTeam && axisKeys.some(k => {
+      // Bat tracking leaderboard: hitters OR pitchers (against), always full-season player-level
+      const needsBatTracking = !isTeam && axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
         return d?.leaderEp === 'bat_tracking' && !!d.leaderCol;
       });
@@ -1805,8 +1817,8 @@ async function generate() {
           // Leaderboard expected_statistics: full season, or fallback for xERA (no searchCol)
           (!useSearch && needsLbEp('expected_statistics')) || (needsLbEvenWithSearch && needsLbEp('expected_statistics'))
             ? fetchSavantLeaderboard(lbType, 'expected_statistics', season) : Promise.resolve(null),
-          // Bat tracking leaderboard: hitters only, always full-season
-          needsBatTracking ? fetchSavantBatTracking(season) : Promise.resolve(null),
+          // Bat tracking leaderboard: hitters or pitchers (against), always full-season
+          needsBatTracking ? fetchSavantBatTracking(season, playerType) : Promise.resolve(null),
           // Custom leaderboard: player-level only (e.g. xwOBACON)
           needsCustom ? fetchSavantCustom(playerType, season, [...new Set(customSelections)]) : Promise.resolve(null),
         ]);
@@ -1824,7 +1836,7 @@ async function generate() {
 
     // Adjusted Barrel enrichment — fetched from @collinmyshot's public Google Sheet,
     // matched to currentData by normalized player name.
-    if (!isTeam && axisKeys.some(k => ABARREL_KEYS.has(baseKey(k)))) {
+    if (isHitting && !isTeam && axisKeys.some(k => ABARREL_KEYS.has(baseKey(k)))) {
       try {
         const aBarrelMap = await fetchABarrelData();
         for (const p of currentData) {
@@ -2270,7 +2282,8 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV']);
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV',
+  'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS']);
 
 function lowerIsBetter(key) {
