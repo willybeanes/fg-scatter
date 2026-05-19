@@ -1759,6 +1759,27 @@ async function generate() {
               }
             }
 
+            // If X is a BP Arsenal stat, enrich prev year players with BP data.
+            if (!isHitting && !isTeam && BP_ARSENAL_KEYS.has(xBkPrev)) {
+              try {
+                const bpMap = await fetchBPArsenal(prevSeason);
+                for (const p of prevPlayers) {
+                  const mlbid = String(p.xMLBAMID || '');
+                  const bp = bpMap.get(mlbid);
+                  p['StuffPro']       = bp?.StuffPro       ?? null;
+                  p['PitchPro']       = bp?.PitchPro        ?? null;
+                  p['SurpriseFactor'] = bp?.SurpriseFactor  ?? null;
+                  p['MovementSpread'] = bp?.MovementSpread  ?? null;
+                  p['VelocitySpread'] = bp?.VelocitySpread  ?? null;
+                  p['PitchTypeProb']  = bp?.PitchTypeProb   ?? null;
+                  p['ExpSwStr']       = bp?.ExpSwStr         ?? null;
+                  p['ExpDamage']      = bp?.ExpDamage        ?? null;
+                }
+              } catch (bpPrevErr) {
+                console.warn('Prev year BP Arsenal fetch failed:', bpPrevErr.message);
+              }
+            }
+
             const xKeyRaw = selX.value;
             const prevMap = {};
             for (const p of prevPlayers) {
