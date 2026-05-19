@@ -512,6 +512,7 @@
 <script>
 const PROXY = 'https://fg-proxy.vercel.app/api/fangraphs';
 const SAVANT_PROXY = 'https://fg-proxy.vercel.app/api/savant';
+const BP_PROXY = 'https://fg-proxy.vercel.app/api/bp';
 
 // Stats where Baseball Savant data is fresher than FanGraphs' cached copy.
 // leaderEp:  which leaderboard endpoint to use for full-season queries
@@ -892,6 +893,16 @@ const STAT_GROUPS_PITCHING = [
   { group: 'Stuff+ / PitchingBot', stats: [
     { key: 'sp_stuff', label: 'Stuff+' }, { key: 'sp_location', label: 'Location+' },
     { key: 'sp_pitching', label: 'Pitching+' },
+  ]},
+  { group: 'Arsenal Pro (BP)', stats: [
+    { key: 'StuffPro',       label: 'StuffPro'        },
+    { key: 'PitchPro',       label: 'PitchPro'        },
+    { key: 'SurpriseFactor', label: 'Surprise Factor' },
+    { key: 'MovementSpread', label: 'Movement Spread' },
+    { key: 'VelocitySpread', label: 'Velocity Spread' },
+    { key: 'PitchTypeProb',  label: 'Pitch Type Prob' },
+    { key: 'ExpSwStr',       label: 'xSwStr%'         },
+    { key: 'ExpDamage',      label: 'xDamage'         },
   ]},
 ];
 
@@ -1437,6 +1448,37 @@ async function fetchABarrelData() {
   return map;
 }
 
+// ── Baseball Prospectus Arsenal Pro data ──────────────────────────────────────
+// Source: BP leaderboards API, arsenalpro_lb tab
+// Matched to scatter data via mlbid = xMLBAMID
+const BP_ARSENAL_KEYS = new Set(['StuffPro','PitchPro','SurpriseFactor','MovementSpread','VelocitySpread','PitchTypeProb','ExpSwStr','ExpDamage']);
+const _bpCache = new Map();
+
+async function fetchBPArsenal(season) {
+  if (_bpCache.has(season)) return _bpCache.get(season);
+  const resp = await fetch(`${BP_PROXY}?season=${season}`);
+  if (!resp.ok) throw new Error(`BP Arsenal HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.error) throw new Error(`BP Arsenal: ${json.error}`);
+  const map = new Map();
+  for (const row of (json.results || [])) {
+    const mlbid = String(row.mlbid || '');
+    if (!mlbid) continue;
+    map.set(mlbid, {
+      StuffPro:       row.stuffpro_agg        ?? null,
+      PitchPro:       row.pitchpro_agg        ?? null,
+      SurpriseFactor: row.surprise_factor     ?? null,
+      MovementSpread: row.movement_spread     ?? null,
+      VelocitySpread: row.velocity_spread     ?? null,
+      PitchTypeProb:  row.pitch_type_probability ?? null,
+      ExpSwStr:       row.exp_swstr_rate      ?? null,
+      ExpDamage:      row.exp_damage          ?? null,
+    });
+  }
+  _bpCache.set(season, map);
+  return map;
+}
+
 // Cache rookie player ID sets by "season:stats" key.
 // Fetches with ind=2 (full-season, no split) and caches the Set<playerid>.
 const _rookieIdCache = new Map();
@@ -1851,6 +1893,27 @@ async function generate() {
       }
     }
 
+    // BP Arsenal Pro enrichment — pitcher mode only, matched by xMLBAMID
+    if (!isHitting && !isTeam && axisKeys.some(k => BP_ARSENAL_KEYS.has(baseKey(k)))) {
+      try {
+        const bpMap = await fetchBPArsenal(season);
+        for (const p of currentData) {
+          const mlbid = String(p.xMLBAMID || '');
+          const bp = bpMap.get(mlbid);
+          p['StuffPro']       = bp?.StuffPro       ?? null;
+          p['PitchPro']       = bp?.PitchPro        ?? null;
+          p['SurpriseFactor'] = bp?.SurpriseFactor  ?? null;
+          p['MovementSpread'] = bp?.MovementSpread  ?? null;
+          p['VelocitySpread'] = bp?.VelocitySpread  ?? null;
+          p['PitchTypeProb']  = bp?.PitchTypeProb   ?? null;
+          p['ExpSwStr']       = bp?.ExpSwStr         ?? null;
+          p['ExpDamage']      = bp?.ExpDamage        ?? null;
+        }
+      } catch (bpErr) {
+        console.warn('BP Arsenal fetch failed:', bpErr.message);
+      }
+    }
+
     currentXKey = selX.value;
     currentYKey = selY.value;
     currentColorKey = selColor.value;
@@ -2233,6 +2296,8 @@ const PCT_KEYS = new Set([
   'Barrel%','BarrelPA%','aBarrel%','aBarrelPA%','HardHit%',
   // Bat tracking rates (stored as fractions 0–1)
   'FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw',
+  // BP Arsenal Pro rates (stored as fractions 0–1)
+  'ExpSwStr',
 ]);
 
 // Strip hit_/pit_ prefix for format lookups.
@@ -2283,7 +2348,8 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'L','BS','-WPA',
 ]);
 const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV',
-  'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen']);
+  'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
+  'ExpDamage','PitchTypeProb']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS','SwStr%']);
 
 function lowerIsBetter(key) {
@@ -2308,7 +2374,8 @@ function formatStat(v, key) {
   if (SLASH_KEYS.has(bk)) return v.toFixed(3);
   if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt'].includes(bk)) return v.toFixed(1);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt',
+       'StuffPro','PitchPro','SurpriseFactor','MovementSpread','VelocitySpread','PitchTypeProb','ExpDamage'].includes(bk)) return v.toFixed(1);
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
