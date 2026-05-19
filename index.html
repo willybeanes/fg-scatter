@@ -730,13 +730,17 @@ async function fetchSavantSearch(playerType, groupBy, season, dateRange) {
 
 // Fetch Baseball Savant bat-tracking leaderboard CSV
 // type: 'batter' (hitter averages) or 'pitcher' (bat-tracking metrics against a pitcher)
-async function fetchSavantBatTracking(season, type = 'batter') {
+async function fetchSavantBatTracking(season, type = 'batter', dateRange = null) {
   const params = new URLSearchParams({
     path: '/leaderboard/bat-tracking',
     gameType: 'Regular', minSwings: 'q', minGroupSwings: '1',
     seasonStart: season, seasonEnd: season, type,
     team: '', csv: 'true'
   });
+  if (dateRange) {
+    params.set('dateStart', dateRange.dateGt);
+    params.set('dateEnd',   dateRange.dateLt);
+  }
   const resp = await fetch(`${SAVANT_PROXY}?${params}`);
   if (!resp.ok) throw new Error(`Savant bat tracking HTTP ${resp.status}`);
   const text = await resp.text();
@@ -1899,7 +1903,7 @@ async function generate() {
         const incompatibleKeys = [...new Set(
           axisKeys
             .map(k => baseKey(k))
-            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom') && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball'))
+            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom') && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking'))
         )];
         if (incompatibleKeys.length) showSplitWarning(incompatibleKeys.map(optionLabel));
       }
@@ -1961,7 +1965,7 @@ async function generate() {
           (!useSearch && needsLbEp('expected_statistics')) || (needsLbEvenWithSearch && needsLbEp('expected_statistics'))
             ? fetchSavantLeaderboard(lbType, 'expected_statistics', season) : Promise.resolve(null),
           // Bat tracking leaderboard: hitters or pitchers (against), always full-season
-          needsBatTracking ? fetchSavantBatTracking(season, playerType) : Promise.resolve(null),
+          needsBatTracking ? fetchSavantBatTracking(season, playerType, dateRange) : Promise.resolve(null),
           // Batted-ball direction leaderboard: always full-season, player-level
           needsBattedBall ? fetchSavantBattedBall(season, playerType, dateRange) : Promise.resolve(null),
           // Custom leaderboard: player-level only (e.g. xwOBACON)
