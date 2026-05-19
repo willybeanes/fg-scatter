@@ -513,6 +513,7 @@
 const PROXY = 'https://fg-proxy.vercel.app/api/fangraphs';
 const SAVANT_PROXY = 'https://fg-proxy.vercel.app/api/savant';
 const BP_PROXY = 'https://fg-proxy.vercel.app/api/bp';
+const BP_HITTING_PROXY = 'https://fg-proxy.vercel.app/api/bphitting';
 
 // Stats where Baseball Savant data is fresher than FanGraphs' cached copy.
 // leaderEp:  which leaderboard endpoint to use for full-season queries
@@ -944,7 +945,7 @@ const STAT_GROUPS_HITTING = [
     { key: 'Z-Contact%', label: 'Z-Contact%' }, { key: 'Contact%', label: 'Contact%' },
     { key: 'Zone%', label: 'Zone%' }, { key: 'F-Strike%', label: 'F-Strike%' },
     { key: 'SwStr%', label: 'SwStr%' }, { key: 'CStr%', label: 'CStr%' },
-    { key: 'sSEAGER', label: 'sSEAGER' },
+    { key: 'sSEAGER', label: 'sSEAGER' }, { key: 'BP_SEAGER', label: 'SEAGER (BP)' },
   ]},
   { group: 'Baserunning', stats: [
     { key: 'SB', label: 'SB' }, { key: 'CS', label: 'CS' }, { key: 'SB+CS', label: 'SB+CS' },
@@ -952,11 +953,12 @@ const STAT_GROUPS_HITTING = [
     { key: 'SprintSpeed', label: 'Sprint Speed' },
   ]},
   { group: 'Batted Ball Quality', stats: [
-    { key: 'EV', label: 'EV' }, { key: 'EV50', label: 'EV50' }, { key: 'LA', label: 'LA' },
+    { key: 'EV', label: 'EV' }, { key: 'EV50', label: 'EV50' }, { key: 'EV90', label: 'EV90 (BP)' }, { key: 'LA', label: 'LA' },
     { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' },
     { key: 'aBarrel%', label: 'aBarrel/BBE%' }, { key: 'aBarrelPA%', label: 'aBarrel/PA%' }, { key: 'aBarrels', label: 'aBarrels' },
     { key: 'HardHit%', label: 'HardHit%' },
     { key: 'maxEV', label: 'maxEV' },
+    { key: 'SLGCON', label: 'SLGCON (BP)' },
   ]},
   { group: 'Bat Tracking', stats: [
     { key: 'BatSpeed',    label: 'Bat Speed'    },
@@ -1479,6 +1481,31 @@ async function fetchBPArsenal(season) {
   return map;
 }
 
+// ── Baseball Prospectus Hitting data (SLGCON, EV90, SEAGER) ──────────────────
+// Source: BP leaderboards/api/v1/hitting, matched via mlbid = xMLBAMID
+const BP_HITTING_KEYS = new Set(['SLGCON','EV90','BP_SEAGER']);
+const _bpHittingCache = new Map();
+
+async function fetchBPHitting(season) {
+  if (_bpHittingCache.has(season)) return _bpHittingCache.get(season);
+  const resp = await fetch(`${BP_HITTING_PROXY}?season=${season}`);
+  if (!resp.ok) throw new Error(`BP Hitting HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.error) throw new Error(`BP Hitting: ${json.error}`);
+  const map = new Map();
+  for (const row of (json.results || [])) {
+    const mlbid = String(row.mlbid || '');
+    if (!mlbid) continue;
+    map.set(mlbid, {
+      SLGCON:    row.slgcon                 ?? null,
+      EV90:      row.exit_velocity_90_agg   ?? null,
+      BP_SEAGER: row.seager_agg             ?? null,
+    });
+  }
+  _bpHittingCache.set(season, map);
+  return map;
+}
+
 // Cache rookie player ID sets by "season:stats" key.
 // Fetches with ind=2 (full-season, no split) and caches the Set<playerid>.
 const _rookieIdCache = new Map();
@@ -1759,6 +1786,22 @@ async function generate() {
               }
             }
 
+            // If X is a BP Hitting stat, enrich prev year players with BP hitting data.
+            if (isHitting && !isTeam && BP_HITTING_KEYS.has(xBkPrev)) {
+              try {
+                const bpHitMap = await fetchBPHitting(prevSeason);
+                for (const p of prevPlayers) {
+                  const mlbid = String(p.xMLBAMID || '');
+                  const bh = bpHitMap.get(mlbid);
+                  p['SLGCON']    = bh?.SLGCON    ?? null;
+                  p['EV90']      = bh?.EV90      ?? null;
+                  p['BP_SEAGER'] = bh?.BP_SEAGER ?? null;
+                }
+              } catch (bpHitPrevErr) {
+                console.warn('Prev year BP Hitting fetch failed:', bpHitPrevErr.message);
+              }
+            }
+
             // If X is a BP Arsenal stat, enrich prev year players with BP data.
             if (!isHitting && !isTeam && BP_ARSENAL_KEYS.has(xBkPrev)) {
               try {
@@ -1911,6 +1954,22 @@ async function generate() {
         }
       } catch (aBarrelErr) {
         console.warn('aBarrel fetch failed:', aBarrelErr.message);
+      }
+    }
+
+    // BP Hitting enrichment — hitter mode only, matched by xMLBAMID
+    if (isHitting && !isTeam && axisKeys.some(k => BP_HITTING_KEYS.has(baseKey(k)))) {
+      try {
+        const bpHitMap = await fetchBPHitting(season);
+        for (const p of currentData) {
+          const mlbid = String(p.xMLBAMID || '');
+          const bh = bpHitMap.get(mlbid);
+          p['SLGCON']    = bh?.SLGCON    ?? null;
+          p['EV90']      = bh?.EV90      ?? null;
+          p['BP_SEAGER'] = bh?.BP_SEAGER ?? null;
+        }
+      } catch (bpHitErr) {
+        console.warn('BP Hitting fetch failed:', bpHitErr.message);
       }
     }
 
@@ -2387,7 +2446,7 @@ function lowerIsBetter(key) {
 }
 
 // Stats displayed as .xxx (batting average format)
-const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','wOBACON','xwOBA','xSLG','xwOBACON','sSEAGER','BABIP']);
+const SLASH_KEYS = new Set(['AVG','OBP','SLG','OPS','ISO','wOBA','wOBACON','xwOBA','xSLG','xwOBACON','sSEAGER','BABIP','SLGCON']);
 
 // formatStat expects already-converted display values (pct already *100)
 function formatStat(v, key) {
@@ -2395,8 +2454,8 @@ function formatStat(v, key) {
   if (SLASH_KEYS.has(bk)) return v.toFixed(3);
   if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
-  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt',
-       'StuffPro','PitchPro','SurpriseFactor','MovementSpread','VelocitySpread','PitchTypeProb','ExpDamage'].includes(bk)) return v.toFixed(1);
+  if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','EV90','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt',
+       'StuffPro','PitchPro','SurpriseFactor','MovementSpread','VelocitySpread','PitchTypeProb','ExpDamage','BP_SEAGER'].includes(bk)) return v.toFixed(1);
   if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
