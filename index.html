@@ -186,9 +186,6 @@
     .corner-inputs .ci-tr { grid-column: 2; grid-row: 1; }
     .corner-inputs .ci-bl { grid-column: 1; grid-row: 2; }
     .corner-inputs .ci-br { grid-column: 2; grid-row: 2; }
-    @media (max-width: 600px) {
-      #corner-inputs { order: 3; width: 100%; flex: none; }
-    }
     .axis-label-x {
       bottom: 2px;
       left: 50%;
@@ -540,14 +537,20 @@
         <div class="plot-area" id="plot-area"></div>
       </div>
     </div>
-    <div id="below-chart-row" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;margin-top:12px;gap:12px;">
-      <div id="size-toggle" style="display:none;gap:2px;display:none;flex-shrink:0;padding-top:2px;">
-        <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
-        <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
-        <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
-        <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
+    <div id="below-chart-row" style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div id="size-toggle" style="display:none;gap:2px;display:none;">
+          <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
+          <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
+          <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
+          <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
+        </div>
+        <div id="export-btns" style="display:none;display:flex;gap:6px;">
+          <button id="btn-download" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
+          <button id="btn-png" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Export PNG</button>
+        </div>
       </div>
-      <div class="corner-inputs" id="corner-inputs" style="flex:1;min-width:0;">
+      <div class="corner-inputs" id="corner-inputs" style="margin-top:10px;">
         <div class="ci-tl">
           <div class="ci-label">↖ Top Left</div>
           <textarea id="corner-tl" rows="2" placeholder="e.g. low X, high Y"></textarea>
@@ -564,10 +567,6 @@
           <div class="ci-label">Bottom Right ↘</div>
           <textarea id="corner-br" rows="2" placeholder="e.g. high X, low Y"></textarea>
         </div>
-      </div>
-      <div id="export-btns" style="display:none;display:flex;gap:6px;flex-shrink:0;padding-top:2px;">
-        <button id="btn-download" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
-        <button id="btn-png" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Export PNG</button>
       </div>
     </div>
   </div>
