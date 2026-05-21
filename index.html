@@ -186,6 +186,9 @@
     .corner-inputs .ci-tr { grid-column: 2; grid-row: 1; }
     .corner-inputs .ci-bl { grid-column: 1; grid-row: 2; }
     .corner-inputs .ci-br { grid-column: 2; grid-row: 2; }
+    @media (max-width: 600px) {
+      #corner-inputs { order: 3; width: 100%; flex: none; }
+    }
     .axis-label-x {
       bottom: 2px;
       left: 50%;
@@ -537,7 +540,7 @@
         <div class="plot-area" id="plot-area"></div>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:12px;gap:12px;">
+    <div id="below-chart-row" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;margin-top:12px;gap:12px;">
       <div id="size-toggle" style="display:none;gap:2px;display:none;flex-shrink:0;padding-top:2px;">
         <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
         <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
