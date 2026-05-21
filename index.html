@@ -1955,7 +1955,10 @@ async function generate() {
       const prevPeriodLabel    = getPrevPeriodLabel(selSplit.value);
       if (prevPeriodFGParams && prevPeriodLabel) {
         currentPrevPeriodLabel = prevPeriodLabel;
-        const prevQual = isTeam ? '0' : (isHitting ? '200' : '50');
+        // Use qual=0 for the prev period — the period is shorter so standard IP/PA
+        // thresholds (50 IP, 200 PA) would exclude almost everyone. Players without
+        // enough prev-period data simply won't appear on the chart (their y value will be null).
+        const prevQual = '0';
         const prevParams = new URLSearchParams({
           pos: isHitting ? selStats.value : 'all',
           stats: isHitting ? 'bat' : selStats.value,
