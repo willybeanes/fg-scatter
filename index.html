@@ -570,6 +570,9 @@
       </div>
     </div>
   </div>
+  <div style="text-align:center;margin-top:8px;">
+    <button id="btn-clear-labels" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 14px;background:none;color:#bbb;border:1px solid #e0ddd8;border-radius:6px;cursor:pointer;">Clear Labels</button>
+  </div>
   <div class="split-warning" id="split-warning"></div>
   <div class="tooltip" id="tooltip">
     <div class="tooltip-name" id="tt-name"></div>
@@ -1310,6 +1313,10 @@ const cornerBR = document.getElementById('corner-br');
 [cornerTL, cornerTR, cornerBL, cornerBR].forEach(el =>
   el.addEventListener('input', () => { if (currentData) rerenderLayout(); })
 );
+document.getElementById('btn-clear-labels').addEventListener('click', () => {
+  [cornerTL, cornerTR, cornerBL, cornerBR].forEach(el => { el.value = ''; });
+  if (currentData) rerenderLayout();
+});
 
 // Size toggle buttons
 function syncUrlExtras() {
