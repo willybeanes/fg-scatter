@@ -1932,6 +1932,11 @@ async function generate() {
               }
             }
 
+            // Post-Savant derived stats (same as main flow)
+            for (const p of prevPlayers) {
+              p['BarrelPA%'] = (p.PA || 0) > 0 ? (p.Barrels || 0) / (p.PA || 0) : null;
+            }
+
             const xKeyRaw = selX.value;
             const prevMap = {};
             for (const p of prevPlayers) {
@@ -2026,6 +2031,11 @@ async function generate() {
                 } catch (savantPrevErr) {
                   console.warn('Prev period Savant fetch failed:', savantPrevErr.message);
                 }
+              }
+
+              // Post-Savant derived stats (same as main flow)
+              for (const p of prevPlayers) {
+                p['BarrelPA%'] = (p.PA || 0) > 0 ? (p.Barrels || 0) / (p.PA || 0) : null;
               }
 
               const xKeyRaw = selX.value;
