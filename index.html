@@ -623,6 +623,63 @@ function getSavantDateRange(month, season) {
   }
 }
 
+// Returns FanGraphs API params for the period BEFORE the given split, or null if no prior period.
+function getPrevPeriodFGParams(splitValue, season) {
+  const yr = String(season || new Date().getFullYear());
+  const fmt = d => d.toISOString().slice(0, 10);
+  const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return fmt(d); };
+  switch (String(splitValue)) {
+    case '2':  return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-05-01` }; // May → Mar/Apr
+    case '3':  return { month: '5' };                                                        // June → May
+    case '4':  return { month: '6' };                                                        // July → June
+    case '5':  return { month: '7' };                                                        // Aug → July
+    case '6':  return { month: '8' };                                                        // Sept → Aug
+    case '36': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-07-12` }; // 2nd Half → 1st Half
+    case '32': return { month: '1000', startdate: daysAgo(14),  enddate: daysAgo(7) };     // L7 → prior 7
+    case '33': return { month: '1000', startdate: daysAgo(28),  enddate: daysAgo(14) };    // L14 → prior 14
+    case '35': return { month: '1000', startdate: daysAgo(42),  enddate: daysAgo(21) };    // L21 → prior 21
+    case '34': return { month: '1000', startdate: daysAgo(60),  enddate: daysAgo(30) };    // L30 → prior 30
+    default:   return null; // Full season, Mar/Apr, 1st Half — no prior period available
+  }
+}
+
+// Returns a Savant dateRange for the period BEFORE the given split, or null if not applicable.
+function getPrevPeriodSavantDateRange(splitValue, season) {
+  const yr = String(season);
+  const fmt = d => d.toISOString().slice(0, 10);
+  const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return fmt(d); };
+  switch (String(splitValue)) {
+    case '2':  return { dateGt: `${yr}-03-01`, dateLt: `${yr}-05-01` }; // May → Mar/Apr
+    case '3':  return { dateGt: `${yr}-05-01`, dateLt: `${yr}-06-01` }; // June → May
+    case '4':  return { dateGt: `${yr}-06-01`, dateLt: `${yr}-07-01` }; // July → June
+    case '5':  return { dateGt: `${yr}-07-01`, dateLt: `${yr}-08-01` }; // Aug → July
+    case '6':  return { dateGt: `${yr}-08-01`, dateLt: `${yr}-09-01` }; // Sept → Aug
+    case '36': return { dateGt: `${yr}-03-01`, dateLt: `${yr}-07-15` }; // 2nd Half → 1st Half
+    case '32': return { dateGt: daysAgo(14), dateLt: daysAgo(7) };
+    case '33': return { dateGt: daysAgo(28), dateLt: daysAgo(14) };
+    case '35': return { dateGt: daysAgo(42), dateLt: daysAgo(21) };
+    case '34': return { dateGt: daysAgo(60), dateLt: daysAgo(30) };
+    default:   return null;
+  }
+}
+
+// Returns a short human-readable label for the period BEFORE the given split.
+function getPrevPeriodLabel(splitValue) {
+  switch (String(splitValue)) {
+    case '2':  return 'Mar/Apr';
+    case '3':  return 'May';
+    case '4':  return 'June';
+    case '5':  return 'July';
+    case '6':  return 'Aug';
+    case '36': return '1st Half';
+    case '32': return 'Prior 7d';
+    case '33': return 'Prior 14d';
+    case '35': return 'Prior 21d';
+    case '34': return 'Prior 30d';
+    default:   return null;
+  }
+}
+
 // Convert a FanGraphs split code to the correct FanGraphs API params.
 // Several month codes are broken or return wrong data mid-season in FG's API.
 // For those, use month=1000 + explicit startdate/enddate instead.
@@ -1138,6 +1195,7 @@ let currentXKey = null;
 let currentYKey = null;
 let currentGroupBy = 'player';
 let currentPrevYearSeason = null;
+let currentPrevPeriodLabel = null; // human-readable label for the prev period (e.g. "Mar/Apr")
 let hiddenKeys = new Set(); // tracks dismissed players/teams
 let currentMode = 'pitching'; // 'pitching' or 'hitting'
 let zoomState = null;    // { xMin, xMax, yMin, yMax } in display coords, or null
@@ -1230,10 +1288,11 @@ function populateAxisDropdowns() {
       sel.appendChild(og);
     });
   }
-  // "Prev Year" is only meaningful on the Y axis
+  // "Prev Year" and "Prev Period" are only meaningful on the Y axis
   const prevOg = document.createElement('optgroup');
   prevOg.label = 'Compare';
   prevOg.appendChild(new Option('Prev Year (Same Stat)', '__prev_year__'));
+  prevOg.appendChild(new Option('Prev Period (Same Stat)', '__prev_period__'));
   selY.appendChild(prevOg);
 
   // Color ring: same stat list, no Prev Year, plus a "None" option
@@ -1573,7 +1632,8 @@ async function generate() {
   const isCombined = currentMode === 'combined';
   const isTeam = isCombined || selGroup.value === 'team';
   const isHitting = currentMode === 'hitting';
-  currentPrevYearSeason = null; // reset each run
+  currentPrevYearSeason = null;   // reset each run
+  currentPrevPeriodLabel = null;  // reset each run
 
   // Rookie filter: FanGraphs ind=2 is ignored when split params are active,
   // so we always fetch all players (ind=0) and filter client-side against a
@@ -1889,6 +1949,98 @@ async function generate() {
       }
     }
 
+    // Fetch prev-period data when Y = "Prev Period (Same Stat)"
+    if (selY.value === '__prev_period__' && !isCombined) {
+      const prevPeriodFGParams = getPrevPeriodFGParams(selSplit.value, season);
+      const prevPeriodLabel    = getPrevPeriodLabel(selSplit.value);
+      if (prevPeriodFGParams && prevPeriodLabel) {
+        currentPrevPeriodLabel = prevPeriodLabel;
+        const prevQual = isTeam ? '0' : (isHitting ? '200' : '50');
+        const prevParams = new URLSearchParams({
+          pos: isHitting ? selStats.value : 'all',
+          stats: isHitting ? 'bat' : selStats.value,
+          lg: 'all',
+          qual: prevQual,
+          type: '4',
+          season, season1: season,
+          ...prevPeriodFGParams, ind: indParam,
+          hand: '', team: isTeam ? '0,ts' : '0',
+          pageitems: '10000', pagenum: '1',
+          sortstat: 'WAR', sortdir: 'default'
+        });
+        try {
+          const prevResp = await fetch(`${PROXY}?${prevParams}`);
+          if (prevResp.ok) {
+            const prevJson = await prevResp.json();
+            if (!prevJson.error && prevJson.data?.length) {
+              let prevPlayers = prevJson.data;
+
+              // Compute composites on prev period data
+              for (const p of prevPlayers) {
+                p['SV+HLD'] = (p.SV || 0) + (p.HLD || 0);
+                p['SV+HLD+W'] = (p.SV || 0) + (p.HLD || 0) + (p.W || 0);
+                p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
+                p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
+                p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
+                const _wOBACON_d = (p.AB || 0) - (p.SO || 0) + (p.SF || 0);
+                p['wOBACON'] = _wOBACON_d > 0
+                  ? (0.882*(p['1B']||0) + 1.254*(p['2B']||0) + 1.590*(p['3B']||0) + 2.050*(p.HR||0)) / _wOBACON_d
+                  : null;
+              }
+              if (isHitting) addSSEAGER(prevPlayers);
+
+              // Savant enrichment for the prior period (only sources that support date ranges)
+              const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
+              const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
+              const prevSavantDateRange = getPrevPeriodSavantDateRange(selSplit.value, season);
+              if (savantDetail && prevSavantDateRange) {
+                try {
+                  const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
+                  if (savantDetail.leaderEp === 'batted_ball') {
+                    const bbPrevRows = await fetchSavantBattedBall(season, isHitting ? 'batter' : 'pitcher', prevSavantDateRange);
+                    prevPlayers = applySavantRows(prevPlayers, { battedBall: bbPrevRows }, isTeam, '', skipKeys, false);
+                  } else if (savantDetail.leaderEp === 'bat_tracking') {
+                    const btPlayerType = isHitting ? 'batter' : 'pitcher';
+                    if (savantDetail.leaderCol) {
+                      const btRows = await fetchSavantBatTracking(season, btPlayerType, prevSavantDateRange);
+                      prevPlayers = applySavantRows(prevPlayers, { search: null, statcast: null, expected: null, batTracking: btRows }, isTeam, '', skipKeys, false);
+                    } else if (savantDetail.searchCol) {
+                      const srchGroup = isTeam ? 'team' : 'name';
+                      const srchRows = await fetchSavantSearch(btPlayerType, srchGroup, season, prevSavantDateRange);
+                      prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, isTeam, '', skipKeys, true);
+                    }
+                  } else if (savantDetail.searchCol) {
+                    // Stats with a searchCol can be queried via statcast_search for the period
+                    const srchGroup = isTeam ? 'team' : 'name';
+                    const playerType = isHitting ? 'batter' : 'pitcher';
+                    const srchRows = await fetchSavantSearch(playerType, srchGroup, season, prevSavantDateRange);
+                    prevPlayers = applySavantRows(prevPlayers, { search: srchRows, statcast: null, expected: null }, isTeam, '', skipKeys, true);
+                  }
+                  // Note: statcast/expected_statistics leaderboard-only stats don't support date ranges
+                  // and BP data (Arsenal/Hitting) has no date filter — skip for prev period
+                } catch (savantPrevErr) {
+                  console.warn('Prev period Savant fetch failed:', savantPrevErr.message);
+                }
+              }
+
+              const xKeyRaw = selX.value;
+              const prevMap = {};
+              for (const p of prevPlayers) {
+                const key = isTeam ? (p.TeamName || p.TeamNameAbb) : p.playerid;
+                if (key != null) prevMap[key] = p[xKeyRaw] ?? null;
+              }
+              for (const p of currentData) {
+                const key = isTeam ? (p.TeamName || p.TeamNameAbb) : p.playerid;
+                p['__prev_period__'] = prevMap[key] ?? null;
+              }
+            }
+          }
+        } catch (prevPeriodErr) {
+          console.warn('Prev period fetch failed:', prevPeriodErr.message);
+        }
+      }
+    }
+
     // Enrich with fresh Baseball Savant data for statcast/xstat metrics
     const xBk = baseKey(selX.value), yBk = baseKey(selY.value);
     const colorBk = selColor.value !== 'none' ? baseKey(selColor.value) : null;
@@ -2094,6 +2246,8 @@ function rerenderLayout() {
   const xLabel = STAT_OPTIONS.find(s => s.key === xKey)?.label || xKey;
   const yLabel = yKey === '__prev_year__'
     ? `${currentPrevYearSeason ?? parseInt(selSeason.value) - 1} ${xLabel}`
+    : yKey === '__prev_period__'
+    ? `${currentPrevPeriodLabel ?? 'Prev Period'} ${xLabel}`
     : (STAT_OPTIONS.find(s => s.key === yKey)?.label || yKey);
   axisLabelX.textContent = xLabel;
   axisLabelY.textContent = yLabel;
@@ -2239,8 +2393,8 @@ function rerenderLayout() {
   avgLabelY.textContent = `avg ${formatStat(yAvg, yKey)}`;
   plotArea.appendChild(avgLabelY);
 
-  // Diagonal y=x reference line (only for Prev Year comparison)
-  if (yKey === '__prev_year__') {
+  // Diagonal y=x reference line (for Prev Year / Prev Period comparisons)
+  if (yKey === '__prev_year__' || yKey === '__prev_period__') {
     // Find where y=x clips to the visible [xMin,xMax] × [yMin,yMax] box
     const diagStart = Math.max(xMin, yMin);
     const diagEnd   = Math.min(xMax, yMax);
@@ -2264,7 +2418,7 @@ function rerenderLayout() {
   }
 
   // R² regression line
-  if (chkR2.checked && visible.length >= 2 && yKey !== '__prev_year__') {
+  if (chkR2.checked && visible.length >= 2 && yKey !== '__prev_year__' && yKey !== '__prev_period__') {
     const points = visible
       .map(p => [displayVal(p[xKey], xKey), displayVal(p[yKey], yKey)])
       .filter(([x, y]) => isFinite(x) && isFinite(y));
@@ -2434,9 +2588,9 @@ const PCT_KEYS = new Set([
 ]);
 
 // Strip hit_/pit_ prefix for format lookups.
-// __prev_year__ delegates to currentXKey so all formatting/pct logic works transparently.
+// __prev_year__ and __prev_period__ delegate to currentXKey so all formatting/pct logic works transparently.
 function baseKey(key) {
-  if (key === '__prev_year__') return currentXKey ? baseKey(currentXKey) : key;
+  if (key === '__prev_year__' || key === '__prev_period__') return currentXKey ? baseKey(currentXKey) : key;
   return key.replace(/^(hit_|pit_)/, '');
 }
 
@@ -2534,11 +2688,11 @@ function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   }
   const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
   const colorVal = colorLabel != null ? displayVal(player[currentColorKey], currentColorKey) : null;
-  // Delta row for prev-year comparisons
+  // Delta row for prev-year / prev-period comparisons
   let deltaHtml = '';
-  if (yKey === '__prev_year__') {
+  if (yKey === '__prev_year__' || yKey === '__prev_period__') {
     const xDv  = displayVal(player[xKey], xKey);
-    const pyDv = displayVal(player['__prev_year__'], '__prev_year__');
+    const pyDv = displayVal(player[yKey], yKey);
     if (xDv != null && isFinite(xDv) && pyDv != null && isFinite(pyDv)) {
       const delta = xDv - pyDv;
       const improving = lowerIsBetter(xKey) ? delta < 0 : delta > 0;
@@ -2638,10 +2792,11 @@ function downloadCSV() {
   const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
 
   // Header row
-  const isPrevYear = currentYKey === '__prev_year__';
+  const isPrevYear   = currentYKey === '__prev_year__';
+  const isPrevPeriod = currentYKey === '__prev_period__';
   const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
   headers.push(xLabel, yLabel);
-  if (isPrevYear) headers.push('Delta');
+  if (isPrevYear || isPrevPeriod) headers.push('Delta');
   if (colorLabel) headers.push(colorLabel);
 
   // Data rows — only include rows with valid x and y values
@@ -2654,7 +2809,7 @@ function downloadCSV() {
     cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
     cols.push(formatStat(displayVal(xv, currentXKey), currentXKey));
     cols.push(formatStat(displayVal(yv, currentYKey), currentYKey));
-    if (isPrevYear) {
+    if (isPrevYear || isPrevPeriod) {
       const xDv = displayVal(xv, currentXKey);
       const pyDv = displayVal(yv, currentYKey);
       const delta = xDv - pyDv;
