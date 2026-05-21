@@ -2691,6 +2691,11 @@ function showTooltip(e, player, xKey, yKey, xLabel, yLabel) {
   }
   const colorLabel = currentColorKey !== 'none' ? (STAT_OPTIONS.find(s => s.key === currentColorKey)?.label || currentColorKey) : null;
   const colorVal = colorLabel != null ? displayVal(player[currentColorKey], currentColorKey) : null;
+  // When comparing periods, prefix the current-period stat label with the period name (e.g. "May wOBA")
+  const splitPeriodName = selSplit.options[selSplit.selectedIndex]?.text;
+  if (yKey === '__prev_period__' && splitPeriodName && splitPeriodName !== 'Full Season') {
+    xLabel = `${splitPeriodName} ${xLabel}`;
+  }
   // Delta row for prev-year / prev-period comparisons
   let deltaHtml = '';
   if (yKey === '__prev_year__' || yKey === '__prev_period__') {
