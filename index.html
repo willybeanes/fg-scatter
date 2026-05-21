@@ -157,10 +157,8 @@
       grid-template-columns: 1fr 1fr;
       grid-template-rows: auto auto;
       gap: 4px 12px;
-      max-width: 520px;
-      margin: 10px auto 0;
     }
-    .corner-inputs input {
+    .corner-inputs textarea {
       font-family: inherit;
       font-size: 11px;
       font-style: italic;
@@ -171,9 +169,11 @@
       width: 100%;
       box-sizing: border-box;
       background: #faf9f7;
+      resize: none;
+      line-height: 1.4;
     }
-    .corner-inputs input:focus { outline: none; border-color: #aaa; }
-    .corner-inputs input::placeholder { color: #bbb; }
+    .corner-inputs textarea:focus { outline: none; border-color: #aaa; }
+    .corner-inputs textarea::placeholder { color: #bbb; }
     .corner-inputs .ci-label {
       font-size: 9px;
       font-weight: 500;
@@ -537,35 +537,35 @@
         <div class="plot-area" id="plot-area"></div>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
-      <div id="size-toggle" style="display:none;gap:2px;display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:12px;gap:12px;">
+      <div id="size-toggle" style="display:none;gap:2px;display:none;flex-shrink:0;padding-top:2px;">
         <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
         <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
         <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
         <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
       </div>
-      <div id="export-btns" style="display:none;display:flex;gap:6px;">
+      <div class="corner-inputs" id="corner-inputs" style="flex:1;min-width:0;">
+        <div class="ci-tl">
+          <div class="ci-label">↖ Top Left</div>
+          <textarea id="corner-tl" rows="2" placeholder="e.g. low X, high Y"></textarea>
+        </div>
+        <div class="ci-tr">
+          <div class="ci-label">Top Right ↗</div>
+          <textarea id="corner-tr" rows="2" placeholder="e.g. high X, high Y"></textarea>
+        </div>
+        <div class="ci-bl">
+          <div class="ci-label">↙ Bottom Left</div>
+          <textarea id="corner-bl" rows="2" placeholder="e.g. low X, low Y"></textarea>
+        </div>
+        <div class="ci-br">
+          <div class="ci-label">Bottom Right ↘</div>
+          <textarea id="corner-br" rows="2" placeholder="e.g. high X, low Y"></textarea>
+        </div>
+      </div>
+      <div id="export-btns" style="display:none;display:flex;gap:6px;flex-shrink:0;padding-top:2px;">
         <button id="btn-download" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
         <button id="btn-png" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Export PNG</button>
       </div>
-    </div>
-  </div>
-  <div class="corner-inputs" id="corner-inputs">
-    <div class="ci-tl">
-      <div class="ci-label">↖ Top Left</div>
-      <input id="corner-tl" type="text" placeholder="e.g. low X, high Y">
-    </div>
-    <div class="ci-tr">
-      <div class="ci-label">Top Right ↗</div>
-      <input id="corner-tr" type="text" placeholder="e.g. high X, high Y">
-    </div>
-    <div class="ci-bl">
-      <div class="ci-label">↙ Bottom Left</div>
-      <input id="corner-bl" type="text" placeholder="e.g. low X, low Y">
-    </div>
-    <div class="ci-br">
-      <div class="ci-label">Bottom Right ↘</div>
-      <input id="corner-br" type="text" placeholder="e.g. high X, low Y">
     </div>
   </div>
   <div class="split-warning" id="split-warning"></div>
