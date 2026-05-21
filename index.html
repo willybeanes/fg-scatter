@@ -1349,6 +1349,7 @@ function switchMode(mode) {
     if (mode === 'hitting') {
       qualLabel.textContent = 'Min PA';
       selQual.appendChild(new Option('Qualified', 'y'));
+      selQual.appendChild(new Option('1', '1'));
       for (let i = 0; i <= 600; i += 10) selQual.appendChild(new Option(String(i), String(i)));
     } else {
       qualLabel.textContent = 'Min IP';
