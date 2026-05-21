@@ -356,7 +356,7 @@
             <option value="33">Last 14 Days</option>
             <option value="35">Last 21 Days</option>
             <option value="34">Last 30 Days</option>
-            <option value="35">First Half</option>
+            <option value="37">First Half</option>
             <option value="36">Second Half</option>
             <option value="31">March/April</option>
             <option value="2">May</option>
@@ -613,7 +613,7 @@ function getSavantDateRange(month, season) {
     case '4':  return { dateGt: `${yr}-07-01`, dateLt: `${yr}-08-01` }; // July
     case '5':  return { dateGt: `${yr}-08-01`, dateLt: `${yr}-09-01` }; // August
     case '6':  return { dateGt: `${yr}-09-01`, dateLt: `${yr}-11-01` }; // Sept/Oct
-    case '35': return { dateGt: `${yr}-03-01`, dateLt: `${yr}-07-15` }; // First Half
+    case '37': return { dateGt: `${yr}-03-01`, dateLt: `${yr}-07-15` }; // First Half
     case '36': return { dateGt: `${yr}-07-15`, dateLt: `${yr}-11-01` }; // Second Half
     case '32': return { dateGt: daysAgo(7),  dateLt: tomorrow() };      // Last 7 days
     case '33': return { dateGt: daysAgo(14), dateLt: tomorrow() };      // Last 14 days
@@ -632,14 +632,21 @@ function getFGSplitParams(splitValue, season) {
   const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return fmt(d); };
   const today = fmt(new Date());
   switch (String(splitValue)) {
+    // Calendar months — FanGraphs API uses actual calendar month numbers (5=May, 6=June, etc.)
+    case '2':  return { month: '5' };                                                        // May
+    case '3':  return { month: '6' };                                                        // June
+    case '4':  return { month: '7' };                                                        // July
+    case '5':  return { month: '8' };                                                        // August
+    case '6':  return { month: '9' };                                                        // Sept/Oct
+    // Custom date ranges
     case '31': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-05-01` }; // Mar/Apr
     case '32': return { month: '1000', startdate: daysAgo(7),   enddate: today };           // Last 7 days
     case '33': return { month: '1000', startdate: daysAgo(14),  enddate: today };           // Last 14 days
     case '35': return { month: '1000', startdate: daysAgo(21),  enddate: today };           // Last 21 days
     case '34': return { month: '1000', startdate: daysAgo(30),  enddate: today };           // Last 30 days
-    case '35': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-07-12` }; // First Half
+    case '37': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-07-12` }; // First Half
     case '36': return { month: '1000', startdate: `${yr}-07-12`, enddate: `${yr}-11-01` }; // Second Half
-    default:   return { month: splitValue };
+    default:   return { month: '0' }; // Fall back to full season rather than passing a bad value
   }
 }
 
@@ -663,6 +670,7 @@ function updateSplitAvailability() {
     '4':  7,  // July
     '5':  8,  // August
     '6':  9,  // Sept/Oct
+    '37': 3,  // First Half (starts March)
     '36': 7,  // Second Half (~July 12)
   };
 
