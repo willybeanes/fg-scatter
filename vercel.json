@@ -1,3 +1,4 @@
 {
+  "buildCommand": "sed 's|YOUR_PROJECT.supabase.co|'\"$SUPABASE_URL\"'|g; s|YOUR_ANON_KEY|'\"$SUPABASE_ANON_KEY\"'|g' index.html > _index.html && mv _index.html index.html",
   "outputDirectory": "."
 }

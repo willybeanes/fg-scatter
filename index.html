@@ -594,6 +594,9 @@ const SAVANT_PROXY = 'https://fg-proxy.vercel.app/api/savant';
 const BP_PROXY = 'https://fg-proxy.vercel.app/api/bp';
 const BP_HITTING_PROXY = 'https://fg-proxy.vercel.app/api/bphitting';
 
+const SUPABASE_URL      = 'https://YOUR_PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+
 // Stats where Baseball Savant data is fresher than FanGraphs' cached copy.
 // leaderEp:  which leaderboard endpoint to use for full-season queries
 // leaderCol: column name in leaderboard CSV
@@ -1082,6 +1085,11 @@ const STAT_GROUPS_PITCHING = [
     { key: 'PitchTypeProb',  label: 'Pitch Type Prob' },
     { key: 'ExpSwStr',       label: 'xSwStr%'         },
     { key: 'ExpDamage',      label: 'xDamage'         },
+  ]},
+  { group: 'Count Leverage', stats: [
+    { key: 'CoLev',        label: 'CoLev'         },
+    { key: 'CoLev_scaled', label: 'CoLev (scaled)' },
+    { key: 'CoLev_dRE',    label: 'CoLev dRE'     },
   ]},
 ];
 
@@ -2281,6 +2289,36 @@ async function generate() {
       }
     }
 
+    // CoLev enrichment — pitcher mode only, matched by MLBAM ID then normalized name
+    const COLEV_KEYS = new Set(['CoLev', 'CoLev_scaled', 'CoLev_dRE']);
+    if (!isHitting && !isTeam && axisKeys.some(k => COLEV_KEYS.has(baseKey(k)))) {
+      try {
+        const colevResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/colev?season=eq.${season}&select=name,mlbamid,colev,colev_scaled,colev_dre`,
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+        );
+        if (colevResp.ok) {
+          const colevData = await colevResp.json();
+          const colevById = new Map();
+          const colevByName = new Map();
+          for (const row of colevData) {
+            if (row.mlbamid) colevById.set(String(row.mlbamid), row);
+            const nk = (row.name || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+            if (nk) colevByName.set(nk, row);
+          }
+          for (const p of currentData) {
+            const row = colevById.get(String(p.xMLBAMID || ''))
+                     || colevByName.get((p.PlayerName || p.Name || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim());
+            p['CoLev']        = row?.colev        ?? null;
+            p['CoLev_scaled'] = row?.colev_scaled ?? null;
+            p['CoLev_dRE']    = row?.colev_dre    ?? null;
+          }
+        }
+      } catch (colevErr) {
+        console.warn('CoLev fetch failed:', colevErr.message);
+      }
+    }
+
     // BP Arsenal Pro enrichment — pitcher mode only, matched by xMLBAMID
     if (!isHitting && !isTeam && axisKeys.some(k => BP_ARSENAL_KEYS.has(baseKey(k)))) {
       try {
@@ -2754,7 +2792,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV',
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
   'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
   'ExpDamage','PitchTypeProb','StuffPro','PitchPro']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS','SwStr%']);
@@ -2780,6 +2818,8 @@ function formatStat(v, key) {
   const bk = baseKey(key);
   if (SLASH_KEYS.has(bk)) return v.toFixed(3);
   if (PCT_KEYS.has(bk)) return v.toFixed(1) + '%';
+  if (['CoLev','CoLev_dRE'].includes(bk)) return v.toFixed(4);
+  if (['CoLev_scaled'].includes(bk)) return v.toFixed(2);
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
   if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','EV90','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt',
        'StuffPro','PitchPro','SurpriseFactor','MovementSpread','VelocitySpread','PitchTypeProb','ExpDamage','BP_SEAGER'].includes(bk)) return v.toFixed(1);
