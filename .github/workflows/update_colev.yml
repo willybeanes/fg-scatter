@@ -13,15 +13,16 @@ jobs:
     timeout-minutes: 60   # Statcast pulls can take 20–30 min for a full season
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: scripts/requirements.txt
 
       - name: Install dependencies
-        run: pip install pybaseball pandas numpy scikit-learn supabase
+        run: pip install -r scripts/requirements.txt
 
       - name: Compute and upload CoLev
         env:
