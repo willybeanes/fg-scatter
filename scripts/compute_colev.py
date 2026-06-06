@@ -17,7 +17,8 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-from pybaseball import pitching_stats, statcast
+import requests
+from pybaseball import statcast
 from sklearn.preprocessing import MinMaxScaler
 from supabase import create_client
 
@@ -46,12 +47,22 @@ POLARITY_WEIGHTS = {
 SUPABASE_URL = os.environ['SUPABASE_URL']
 SUPABASE_KEY = os.environ['SUPABASE_SERVICE_KEY']
 
-# ── 1. Load FanGraphs qualifying starters via pybaseball ───────────────────────
+# ── 1. Load FanGraphs qualifying starters via fg-proxy ────────────────────────
 print(f'[1/5] Fetching FanGraphs pitching stats for {SEASON}...')
-fg = pitching_stats(SEASON, qual=1)
+
+FG_PROXY = 'https://fg-proxy.vercel.app/api/fangraphs'
+params = {
+    'pos': 'all', 'stats': 'pit', 'lg': 'all', 'qual': '1',
+    'type': '4', 'season': SEASON, 'season1': SEASON,
+    'month': '0', 'ind': '0', 'hand': '', 'team': '0',
+    'pageitems': '10000', 'pagenum': '1',
+    'sortstat': 'WAR', 'sortdir': 'default',
+}
+resp = requests.get(FG_PROXY, params=params, timeout=30)
+resp.raise_for_status()
+fg = pd.DataFrame(resp.json()['data'])
 print(f'      {len(fg)} pitchers, columns: {list(fg.columns)[:15]}')
 
-# pybaseball returns xMLBAMID from the FanGraphs API — find it under various names
 mlbam_col = next((c for c in ['xMLBAMID', 'MLBAMID', 'mlbamid'] if c in fg.columns), None)
 if mlbam_col is None:
     raise RuntimeError(f'No MLBAM ID column found in FanGraphs data. Columns: {list(fg.columns)}')
