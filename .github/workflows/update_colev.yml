@@ -1,0 +1,30 @@
+name: Update CoLev
+
+on:
+  schedule:
+    # Every Tuesday at 8am UTC during baseball season (roughly Apr–Oct)
+    - cron: '0 8 * * 2'
+  workflow_dispatch:
+    # Also allow manual runs from the GitHub Actions tab
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # Statcast pulls can take 20–30 min for a full season
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install pybaseball pandas numpy scikit-learn supabase
+
+      - name: Compute and upload CoLev
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/compute_colev.py
