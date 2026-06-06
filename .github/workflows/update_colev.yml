@@ -2,8 +2,8 @@ name: Update CoLev
 
 on:
   schedule:
-    # Every Tuesday at 8am UTC during baseball season (roughly Apr–Oct)
-    - cron: '0 8 * * 2'
+    # Every day at 8am UTC during baseball season (roughly Apr–Oct)
+    - cron: '0 8 * * *'
   workflow_dispatch:
     # Also allow manual runs from the GitHub Actions tab
 
