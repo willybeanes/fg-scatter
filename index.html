@@ -635,6 +635,10 @@ const SAVANT_FIELD_DETAIL = {
   'PullGB%':   { leaderEp: 'batted_ball', leaderCol: 'pull_gb_rate',     searchCol: null, div: 1 },
   'OppoAir%':  { leaderEp: 'batted_ball', leaderCol: 'oppo_air_rate',    searchCol: null, div: 1 },
   'OppoGB%':   { leaderEp: 'batted_ball', leaderCol: 'oppo_gb_rate',     searchCol: null, div: 1 },
+  // Pitcher-only fallback: wOBA and SLG absent from FG's pitching API — pulled from Savant
+  // expected_statistics. pitcherFallback:true prevents overriding the FG value for hitters.
+  'wOBA': { leaderEp: 'expected_statistics', leaderCol: 'woba', searchCol: null, div: 1, pitcherFallback: true },
+  'SLG':  { leaderEp: 'expected_statistics', leaderCol: 'slg',  searchCol: null, div: 1, pitcherFallback: true },
   // Swing timing + miss distance (full-season leaderboard only, no date-range support)
   'MissDist':  { leaderEp: 'bat_tracking_timing', leaderCol: 'miss_distance',    searchCol: null, div: 1 },
   'OnTime%':   { leaderEp: 'bat_tracking_timing', leaderCol: 'on_time_percent',  searchCol: null, div: 1 },
@@ -1016,7 +1020,11 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
         raw = (detail.leaderEp === 'statcast' ? scRow : expRow)[detail.leaderCol];
       }
       if (raw != null && raw !== '' && isFinite(+raw)) {
-        merged[prefix + fgKey] = +raw / detail.div;
+        const outKey = prefix + fgKey;
+        // pitcherFallback stats (wOBA, SLG): only fill if FG didn't already populate the value
+        if (!detail.pitcherFallback || merged[outKey] == null) {
+          merged[outKey] = +raw / detail.div;
+        }
       }
     }
     return merged;
@@ -1058,7 +1066,7 @@ const STAT_GROUPS_PITCHING = [
     { key: 'IFH%', label: 'IFH%' }, { key: 'BUH%', label: 'BUH%' },
   ]},
   { group: 'Quality of Contact (Against)', stats: [
-    { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
+    { key: 'SLG', label: 'SLG' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
     { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' },
     { key: 'HardHit%', label: 'HardHit%' },
     { key: 'EV', label: 'EV' }, { key: 'maxEV', label: 'maxEV' },
@@ -2012,7 +2020,8 @@ async function generate() {
             // If X is a Savant stat, enrich prev year players with Savant data.
             const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
             const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
-            if (savantDetail) {
+            // pitcherFallback stats (wOBA, SLG): FG already provides them for hitters
+            if (savantDetail && !(savantDetail.pitcherFallback && isHitting)) {
               try {
                 const lbType = (isHitting ? 'batter' : 'pitcher') + (isTeam ? '-team' : '');
                 const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
@@ -2162,7 +2171,8 @@ async function generate() {
               const xBkPrev = selX.value.replace(/^(hit_|pit_)/, '');
               const savantDetail = SAVANT_FIELD_DETAIL[xBkPrev];
               const prevSavantDateRange = getPrevPeriodSavantDateRange(selSplit.value, season);
-              if (savantDetail && prevSavantDateRange) {
+              // pitcherFallback stats (wOBA, SLG): FG provides them for hitters; no date-range for pitchers
+              if (savantDetail && prevSavantDateRange && !(savantDetail.pitcherFallback && isHitting)) {
                 try {
                   const skipKeys = isHitting ? new Set(['xERA']) : new Set(['xwOBA', 'xSLG']);
                   if (savantDetail.leaderEp === 'batted_ball') {
@@ -2239,15 +2249,22 @@ async function generate() {
         const incompatibleKeys = [...new Set(
           axisKeys
             .map(k => baseKey(k))
-            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom') && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking_timing'))
+            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].pitcherFallback && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom') && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking_timing'))
         )];
         if (incompatibleKeys.length) showSplitWarning(incompatibleKeys.map(optionLabel));
       }
 
       // Helper: does any axis need a particular leaderboard endpoint?
-      const needsLbEp = ep => axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === ep);
+      // pitcherFallback stats (wOBA, SLG) are skipped for hitters — FG already provides them.
+      const needsLbEp = ep => axisKeys.some(k => {
+        const d = SAVANT_FIELD_DETAIL[k];
+        return d?.leaderEp === ep && (!d.pitcherFallback || !isHitting);
+      });
       // Does any axis have a savant key at all?
-      const needsAnySavant = axisKeys.some(k => SAVANT_FIELD_DETAIL[k]);
+      const needsAnySavant = axisKeys.some(k => {
+        const d = SAVANT_FIELD_DETAIL[k];
+        return d && (!d.pitcherFallback || !isHitting);
+      });
       // Bat tracking stats that have a searchCol — need statcast_search even in full-season mode
       const needsBtSearch = isHitting && axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
@@ -2256,7 +2273,10 @@ async function generate() {
       // Does any axis need statcast_search (has a searchCol)?
       const needsSearch = needsBtSearch || (useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.searchCol));
       // Do we still need leaderboard even in search mode?
-      const needsLbEvenWithSearch = useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking_timing');
+      const needsLbEvenWithSearch = useSearch && axisKeys.some(k => {
+        const d = SAVANT_FIELD_DETAIL[k];
+        return d && !d.searchCol && !d.pitcherFallback && d.leaderEp !== 'bat_tracking' && d.leaderEp !== 'batted_ball' && d.leaderEp !== 'bat_tracking_timing';
+      });
       // Bat tracking leaderboard: hitters OR pitchers (against), always full-season player-level
       const needsBatTracking = !isTeam && axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
@@ -2861,7 +2881,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','SLG','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
   'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
   'ExpDamage','PitchTypeProb','StuffPro','PitchPro',
   // Swing timing: on-time/perfect/centered/lined-up contact is bad for pitchers
