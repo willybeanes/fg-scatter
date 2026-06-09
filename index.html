@@ -645,6 +645,7 @@ const SAVANT_FIELD_DETAIL = {
   'Centered%': { leaderEp: 'bat_tracking_timing', leaderCol: 'centered_percent', searchCol: null, div: 1 },
   'Flailed%':  { leaderEp: 'bat_tracking_timing', leaderCol: 'flailed_percent',  searchCol: null, div: 1 },
   'TiedUp%':   { leaderEp: 'bat_tracking_timing', leaderCol: 'tied_up_percent',  searchCol: null, div: 1 },
+  'LinedUp%':  { leaderEp: 'bat_tracking_timing', leaderCol: 'lined_up_percent', searchCol: null, div: 1 },
   'Over%':     { leaderEp: 'bat_tracking_timing', leaderCol: 'over_percent',     searchCol: null, div: 1 },
   'Under%':    { leaderEp: 'bat_tracking_timing', leaderCol: 'under_percent',    searchCol: null, div: 1 },
 };
@@ -1091,6 +1092,7 @@ const STAT_GROUPS_PITCHING = [
     { key: 'Centered%', label: 'Centered%'   },
     { key: 'Flailed%',  label: 'Flailed%'    },
     { key: 'TiedUp%',   label: 'Tied Up%'    },
+    { key: 'LinedUp%',  label: 'Lined Up%'   },
     { key: 'Over%',     label: 'Over%'       },
     { key: 'Under%',    label: 'Under%'      },
   ]},
@@ -1213,6 +1215,7 @@ const STAT_GROUPS_HITTING = [
     { key: 'Centered%',  label: 'Centered%'    },
     { key: 'Flailed%',   label: 'Flailed%'     },
     { key: 'TiedUp%',    label: 'Tied Up%'     },
+    { key: 'LinedUp%',   label: 'Lined Up%'    },
     { key: 'Over%',      label: 'Over%'        },
     { key: 'Under%',     label: 'Under%'       },
   ]},
@@ -2808,7 +2811,7 @@ const PCT_KEYS = new Set([
   // Batted-ball direction rates (stored as fractions 0–1)
   'PullAir%','PullGB%','OppoAir%','OppoGB%',
   // Swing timing + miss distance rates (stored as fractions 0–1)
-  'OnTime%','Early%','Late%','Perfect%','Flawed%','Centered%','Flailed%','TiedUp%','Over%','Under%',
+  'OnTime%','Early%','Late%','Perfect%','Flawed%','Centered%','Flailed%','TiedUp%','LinedUp%','Over%','Under%',
 ]);
 
 // Strip hit_/pit_ prefix for format lookups.
@@ -2860,7 +2863,9 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
 ]);
 const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
   'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
-  'ExpDamage','PitchTypeProb','StuffPro','PitchPro']);
+  'ExpDamage','PitchTypeProb','StuffPro','PitchPro',
+  // Swing timing: on-time/perfect/centered/lined-up contact is bad for pitchers
+  'OnTime%','Perfect%','Centered%','LinedUp%']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS','SwStr%']);
 
 function lowerIsBetter(key) {
