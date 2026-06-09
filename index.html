@@ -635,6 +635,18 @@ const SAVANT_FIELD_DETAIL = {
   'PullGB%':   { leaderEp: 'batted_ball', leaderCol: 'pull_gb_rate',     searchCol: null, div: 1 },
   'OppoAir%':  { leaderEp: 'batted_ball', leaderCol: 'oppo_air_rate',    searchCol: null, div: 1 },
   'OppoGB%':   { leaderEp: 'batted_ball', leaderCol: 'oppo_gb_rate',     searchCol: null, div: 1 },
+  // Swing timing + miss distance (full-season leaderboard only, no date-range support)
+  'MissDist':  { leaderEp: 'bat_tracking_timing', leaderCol: 'miss_distance',    searchCol: null, div: 1 },
+  'OnTime%':   { leaderEp: 'bat_tracking_timing', leaderCol: 'on_time_percent',  searchCol: null, div: 1 },
+  'Early%':    { leaderEp: 'bat_tracking_timing', leaderCol: 'early_percent',    searchCol: null, div: 1 },
+  'Late%':     { leaderEp: 'bat_tracking_timing', leaderCol: 'late_percent',     searchCol: null, div: 1 },
+  'Perfect%':  { leaderEp: 'bat_tracking_timing', leaderCol: 'perfect_percent',  searchCol: null, div: 1 },
+  'Flawed%':   { leaderEp: 'bat_tracking_timing', leaderCol: 'flawed_percent',   searchCol: null, div: 1 },
+  'Centered%': { leaderEp: 'bat_tracking_timing', leaderCol: 'centered_percent', searchCol: null, div: 1 },
+  'Flailed%':  { leaderEp: 'bat_tracking_timing', leaderCol: 'flailed_percent',  searchCol: null, div: 1 },
+  'TiedUp%':   { leaderEp: 'bat_tracking_timing', leaderCol: 'tied_up_percent',  searchCol: null, div: 1 },
+  'Over%':     { leaderEp: 'bat_tracking_timing', leaderCol: 'over_percent',     searchCol: null, div: 1 },
+  'Under%':    { leaderEp: 'bat_tracking_timing', leaderCol: 'under_percent',    searchCol: null, div: 1 },
 };
 const SAVANT_KEYS = new Set(Object.keys(SAVANT_FIELD_DETAIL));
 
@@ -914,14 +926,29 @@ async function fetchSavantBattedBall(season, type = 'batter', dateRange = null) 
   return parseCSV(text);
 }
 
+// Fetch Baseball Savant swing timing + miss distance leaderboard CSV (full-season only)
+// type: 'batter' or 'pitcher'
+async function fetchSavantSwingTiming(season, type = 'batter') {
+  const params = new URLSearchParams({
+    path: '/leaderboard/bat-tracking/swing-timing-miss-distance',
+    type, csv: 'true'
+  });
+  params.append('season[]', season);
+  const resp = await fetch(`${SAVANT_PROXY}?${params}`);
+  if (!resp.ok) throw new Error(`Savant swing timing HTTP ${resp.status}`);
+  const text = await resp.text();
+  if (text.trim().startsWith('<')) throw new Error('Savant swing timing returned HTML');
+  return parseCSV(text);
+}
+
 // Merge savant data into FG rows.
-// data: { search, statcast, expected, batTracking, custom } — each is a parsed CSV array or null
+// data: { search, statcast, expected, batTracking, battedBall, swingTiming, custom } — each is a parsed CSV array or null
 // isTeam: true = team-level matching
 // prefix: '' for player/team mode; 'hit_' or 'pit_' for combined mode
 // skipFgKeys: skip certain keys (e.g. skip xERA for hitting side)
 // useSearch: true = use statcast_search data (date range); false = use leaderboard data
 function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set(), useSearch = false) {
-  if (!data.search && !data.statcast && !data.expected && !data.batTracking && !data.custom && !data.battedBall) return rows;
+  if (!data.search && !data.statcast && !data.expected && !data.batTracking && !data.custom && !data.battedBall && !data.swingTiming) return rows;
 
   // Build lookup maps
   // Leaderboard: keyed by team_id (abbr) for teams, player_id for players
@@ -934,6 +961,8 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
   const btMap = Object.fromEntries((data.batTracking || []).filter(r => r.id).map(r => [r.id, r]));
   // Batted-ball direction leaderboard: also keyed by 'id'
   const bbMap = Object.fromEntries((data.battedBall || []).filter(r => r.id).map(r => [r.id, r]));
+  // Swing timing + miss distance leaderboard: also keyed by 'id'
+  const timingMap = Object.fromEntries((data.swingTiming || []).filter(r => r.id).map(r => [r.id, r]));
   // Custom leaderboard: always keyed by player_id (MLBAM)
   const customMap = Object.fromEntries((data.custom || []).filter(r => r.player_id).map(r => [r.player_id, r]));
 
@@ -950,6 +979,7 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
     const expRow    = expMap[lbMatchId]        || {};
     const btRow     = btMap[playerMlbamId]     || {};
     const bbRow     = bbMap[playerMlbamId]     || {};
+    const timingRow = timingMap[playerMlbamId] || {};
     const customRow = customMap[playerMlbamId] || {};
     const merged  = { ...p };
 
@@ -971,6 +1001,9 @@ function applySavantRows(rows, data, isTeam, prefix = '', skipFgKeys = new Set()
       } else if (detail.leaderEp === 'batted_ball') {
         // Batted-ball direction leaderboard — always full-season, player-level
         raw = bbRow[detail.leaderCol];
+      } else if (detail.leaderEp === 'bat_tracking_timing') {
+        // Swing timing + miss distance leaderboard — full-season, player-level
+        raw = timingRow[detail.leaderCol];
       } else if (detail.leaderEp === 'custom') {
         // Custom leaderboard stat (e.g. xwOBACON) — always full-season, player-level
         raw = customRow[detail.leaderCol];
@@ -1049,6 +1082,17 @@ const STAT_GROUPS_PITCHING = [
     { key: 'SqUp/Sw',   label: 'Sq-Up/Sw'    },
     { key: 'SwingLen',  label: 'Swing Len'   },
     { key: 'Swords',    label: 'Swords'      },
+    { key: 'MissDist',  label: 'Miss Dist'   },
+    { key: 'OnTime%',   label: 'On Time%'    },
+    { key: 'Early%',    label: 'Early%'      },
+    { key: 'Late%',     label: 'Late%'       },
+    { key: 'Perfect%',  label: 'Perfect%'    },
+    { key: 'Flawed%',   label: 'Flawed%'     },
+    { key: 'Centered%', label: 'Centered%'   },
+    { key: 'Flailed%',  label: 'Flailed%'    },
+    { key: 'TiedUp%',   label: 'Tied Up%'    },
+    { key: 'Over%',     label: 'Over%'       },
+    { key: 'Under%',    label: 'Under%'      },
   ]},
   { group: 'Workload', stats: [
     { key: 'Starting', label: 'Starting' }, { key: 'Start-IP', label: 'Start-IP' },
@@ -1160,6 +1204,17 @@ const STAT_GROUPS_HITTING = [
     { key: 'AttackAngle', label: 'Attack Angle' },
     { key: 'AttackDir',   label: 'Attack Dir'   },
     { key: 'SwingTilt',   label: 'Swing Tilt'   },
+    { key: 'MissDist',   label: 'Miss Dist'    },
+    { key: 'OnTime%',    label: 'On Time%'     },
+    { key: 'Early%',     label: 'Early%'       },
+    { key: 'Late%',      label: 'Late%'        },
+    { key: 'Perfect%',   label: 'Perfect%'     },
+    { key: 'Flawed%',    label: 'Flawed%'      },
+    { key: 'Centered%',  label: 'Centered%'    },
+    { key: 'Flailed%',   label: 'Flailed%'     },
+    { key: 'TiedUp%',    label: 'Tied Up%'     },
+    { key: 'Over%',      label: 'Over%'        },
+    { key: 'Under%',     label: 'Under%'       },
   ]},
   { group: 'Plus Stats', stats: [
     { key: 'AVG+', label: 'AVG+' }, { key: 'BB%+', label: 'BB%+' }, { key: 'K%+', label: 'K%+' },
@@ -1961,6 +2016,9 @@ async function generate() {
                 if (savantDetail.leaderEp === 'batted_ball') {
                   const bbPrevRows = await fetchSavantBattedBall(prevSeason, isHitting ? 'batter' : 'pitcher');
                   prevPlayers = applySavantRows(prevPlayers, { battedBall: bbPrevRows }, isTeam, '', skipKeys, false);
+                } else if (savantDetail.leaderEp === 'bat_tracking_timing') {
+                  const timingPrevRows = await fetchSavantSwingTiming(prevSeason, isHitting ? 'batter' : 'pitcher');
+                  prevPlayers = applySavantRows(prevPlayers, { swingTiming: timingPrevRows }, isTeam, '', skipKeys, false);
                 } else if (savantDetail.leaderEp === 'bat_tracking') {
                   const btPlayerType = isHitting ? 'batter' : 'pitcher';
                   if (savantDetail.leaderCol) {
@@ -2107,6 +2165,8 @@ async function generate() {
                   if (savantDetail.leaderEp === 'batted_ball') {
                     const bbPrevRows = await fetchSavantBattedBall(season, isHitting ? 'batter' : 'pitcher', prevSavantDateRange);
                     prevPlayers = applySavantRows(prevPlayers, { battedBall: bbPrevRows }, isTeam, '', skipKeys, false);
+                  } else if (savantDetail.leaderEp === 'bat_tracking_timing') {
+                    // Timing endpoint has no date-range filtering; skip for prev period
                   } else if (savantDetail.leaderEp === 'bat_tracking') {
                     const btPlayerType = isHitting ? 'batter' : 'pitcher';
                     if (savantDetail.leaderCol) {
@@ -2176,7 +2236,7 @@ async function generate() {
         const incompatibleKeys = [...new Set(
           axisKeys
             .map(k => baseKey(k))
-            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom') && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking'))
+            .filter(k => ABARREL_KEYS.has(k) || (SAVANT_FIELD_DETAIL[k] && (SAVANT_FIELD_DETAIL[k].searchCol === null || SAVANT_FIELD_DETAIL[k].leaderEp === 'custom') && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking_timing'))
         )];
         if (incompatibleKeys.length) showSplitWarning(incompatibleKeys.map(optionLabel));
       }
@@ -2193,7 +2253,7 @@ async function generate() {
       // Does any axis need statcast_search (has a searchCol)?
       const needsSearch = needsBtSearch || (useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.searchCol));
       // Do we still need leaderboard even in search mode?
-      const needsLbEvenWithSearch = useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball');
+      const needsLbEvenWithSearch = useSearch && axisKeys.some(k => SAVANT_FIELD_DETAIL[k] && !SAVANT_FIELD_DETAIL[k].searchCol && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'batted_ball' && SAVANT_FIELD_DETAIL[k].leaderEp !== 'bat_tracking_timing');
       // Bat tracking leaderboard: hitters OR pitchers (against), always full-season player-level
       const needsBatTracking = !isTeam && axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
@@ -2201,6 +2261,8 @@ async function generate() {
       });
       // Batted-ball direction leaderboard: always full-season, player-level
       const needsBattedBall = !isTeam && axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === 'batted_ball');
+      // Swing timing + miss distance leaderboard: full-season only, player-level
+      const needsSwingTiming = !isTeam && axisKeys.some(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === 'bat_tracking_timing');
       // Custom leaderboard stats (e.g. xwOBACON) — always full-season, player-level only
       const customSelections = axisKeys.flatMap(k => SAVANT_FIELD_DETAIL[k]?.leaderEp === 'custom' ? SAVANT_FIELD_DETAIL[k].selections : []);
       const needsCustom = !isTeam && customSelections.length > 0;
@@ -2228,7 +2290,7 @@ async function generate() {
         const srchGroup  = isTeam ? 'team' : 'name';
         const skipKeys   = isHitting ? new Set(['xERA']) : new Set();
 
-        const [srchRows, scRows, expRows, btRows, bbRows, customRows] = await Promise.all([
+        const [srchRows, scRows, expRows, btRows, bbRows, customRows, timingRows] = await Promise.all([
           // statcast_search: one call covers all searchCol stats for any date range
           needsSearch ? fetchSavantSearch(playerType, srchGroup, season, dateRange) : Promise.resolve(null),
           // Leaderboard statcast: full season, or fallback for stats with no searchCol
@@ -2243,8 +2305,10 @@ async function generate() {
           needsBattedBall ? fetchSavantBattedBall(season, playerType, dateRange) : Promise.resolve(null),
           // Custom leaderboard: player-level only (e.g. xwOBACON)
           needsCustom ? fetchSavantCustom(playerType, season, [...new Set(customSelections)]) : Promise.resolve(null),
+          // Swing timing + miss distance: full-season only, player-level
+          needsSwingTiming ? fetchSavantSwingTiming(season, playerType) : Promise.resolve(null),
         ]);
-        currentData = applySavantRows(currentData, { search: srchRows, statcast: scRows, expected: expRows, batTracking: btRows, battedBall: bbRows, custom: customRows }, isTeam, '', skipKeys, useSearch);
+        currentData = applySavantRows(currentData, { search: srchRows, statcast: scRows, expected: expRows, batTracking: btRows, battedBall: bbRows, custom: customRows, swingTiming: timingRows }, isTeam, '', skipKeys, useSearch);
       }
     } catch (savantErr) {
       console.warn('Baseball Savant enrichment failed — using FanGraphs data:', savantErr.message);
@@ -2743,6 +2807,8 @@ const PCT_KEYS = new Set([
   'ExpSwStr',
   // Batted-ball direction rates (stored as fractions 0–1)
   'PullAir%','PullGB%','OppoAir%','OppoGB%',
+  // Swing timing + miss distance rates (stored as fractions 0–1)
+  'OnTime%','Early%','Late%','Perfect%','Flawed%','Centered%','Flailed%','TiedUp%','Over%','Under%',
 ]);
 
 // Strip hit_/pit_ prefix for format lookups.
