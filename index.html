@@ -1066,7 +1066,7 @@ const STAT_GROUPS_PITCHING = [
     { key: 'IFH%', label: 'IFH%' }, { key: 'BUH%', label: 'BUH%' },
   ]},
   { group: 'Quality of Contact (Against)', stats: [
-    { key: 'SLG', label: 'SLG' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
+    { key: 'SLG', label: 'SLG' }, { key: 'wOBACON', label: 'wOBACON' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
     { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' },
     { key: 'HardHit%', label: 'HardHit%' },
     { key: 'EV', label: 'EV' }, { key: 'maxEV', label: 'maxEV' },
@@ -2063,6 +2063,26 @@ async function generate() {
               }
             }
 
+            // Pitcher wOBACON (prev year): if wOBACON is the X axis, ensure wOBA is fetched
+            if (!isHitting && !isTeam && xBkPrev === 'wOBACON') {
+              try {
+                if (!SAVANT_FIELD_DETAIL[xBkPrev]) { // wOBACON not in SAVANT_FIELD_DETAIL — fetch manually
+                  const expRows = await fetchSavantLeaderboard('pitcher', 'expected_statistics', prevSeason);
+                  prevPlayers = applySavantRows(prevPlayers, { expected: expRows }, isTeam, '', skipKeys, false);
+                }
+                for (const p of prevPlayers) {
+                  if (p.wOBA != null && (p.TBF || 0) > 0 && p.wOBACON == null) {
+                    const uBB = (p.BB || 0) - (p.IBB || 0);
+                    const num = p.wOBA * p.TBF - 0.696 * uBB - 0.726 * (p.HBP || 0);
+                    const den = p.TBF - (p.BB || 0) - (p.IBB || 0) - (p.HBP || 0) - (p.SO || 0);
+                    p['wOBACON'] = den > 0 ? num / den : null;
+                  }
+                }
+              } catch (pitWobPrevErr) {
+                console.warn('Prev year pitcher wOBACON derivation failed:', pitWobPrevErr.message);
+              }
+            }
+
             // If X is a BP Hitting stat, enrich prev year players with BP hitting data.
             if (isHitting && !isTeam && BP_HITTING_KEYS.has(xBkPrev)) {
               try {
@@ -2254,14 +2274,19 @@ async function generate() {
         if (incompatibleKeys.length) showSplitWarning(incompatibleKeys.map(optionLabel));
       }
 
+      // Pitcher wOBACON is derived from wOBA (Savant) + FG counting stats — not in SAVANT_FIELD_DETAIL
+      const needsPitcherWobacon = !isHitting && !isTeam && axisKeys.some(k => baseKey(k) === 'wOBACON');
       // Helper: does any axis need a particular leaderboard endpoint?
       // pitcherFallback stats (wOBA, SLG) are skipped for hitters — FG already provides them.
-      const needsLbEp = ep => axisKeys.some(k => {
-        const d = SAVANT_FIELD_DETAIL[k];
-        return d?.leaderEp === ep && (!d.pitcherFallback || !isHitting);
-      });
+      const needsLbEp = ep => {
+        if (ep === 'expected_statistics' && needsPitcherWobacon) return true;
+        return axisKeys.some(k => {
+          const d = SAVANT_FIELD_DETAIL[k];
+          return d?.leaderEp === ep && (!d.pitcherFallback || !isHitting);
+        });
+      };
       // Does any axis have a savant key at all?
-      const needsAnySavant = axisKeys.some(k => {
+      const needsAnySavant = needsPitcherWobacon || axisKeys.some(k => {
         const d = SAVANT_FIELD_DETAIL[k];
         return d && (!d.pitcherFallback || !isHitting);
       });
@@ -2341,6 +2366,14 @@ async function generate() {
     for (const p of currentData) {
       // Barrel/PA% — stored as 0-1 fraction (like other PCT_KEYS) so displayVal ×100 works correctly
       p['BarrelPA%'] = (p.PA || 0) > 0 ? (p.Barrels || 0) / (p.PA || 0) : null;
+      // Pitcher wOBACON: derived from Savant wOBA + FG counting stats
+      // Formula: (wOBA×TBF - 0.696×uBB - 0.726×HBP) / (TBF - BB - IBB - HBP - SO)
+      if (!isHitting && p.wOBA != null && (p.TBF || 0) > 0 && p.wOBACON == null) {
+        const uBB = (p.BB || 0) - (p.IBB || 0);
+        const num = p.wOBA * p.TBF - 0.696 * uBB - 0.726 * (p.HBP || 0);
+        const den = p.TBF - (p.BB || 0) - (p.IBB || 0) - (p.HBP || 0) - (p.SO || 0);
+        p['wOBACON'] = den > 0 ? num / den : null;
+      }
     }
 
     // Adjusted Barrel enrichment — fetched from @collinmyshot's public Google Sheet,
@@ -2881,7 +2914,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','SLG','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','SLG','wOBACON','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
   'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
   'ExpDamage','PitchTypeProb','StuffPro','PitchPro',
   // Swing timing: on-time/perfect/centered/lined-up contact is bad for pitchers
