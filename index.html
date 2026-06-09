@@ -1058,7 +1058,7 @@ const STAT_GROUPS_PITCHING = [
     { key: 'IFH%', label: 'IFH%' }, { key: 'BUH%', label: 'BUH%' },
   ]},
   { group: 'Quality of Contact (Against)', stats: [
-    { key: 'wOBACON', label: 'wOBACON' }, { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
+    { key: 'xwOBA', label: 'xwOBA' }, { key: 'xwOBACON', label: 'xwOBACON' }, { key: 'xSLG', label: 'xSLG' },
     { key: 'Barrel%', label: 'Barrel/BBE%' }, { key: 'BarrelPA%', label: 'Barrel/PA%' }, { key: 'Barrels', label: 'Barrels' },
     { key: 'HardHit%', label: 'HardHit%' },
     { key: 'EV', label: 'EV' }, { key: 'maxEV', label: 'maxEV' },
@@ -2861,7 +2861,7 @@ const LOWER_IS_BETTER_ALWAYS = new Set([
   'ERA-','FIP-','xFIP-',
   'L','BS','-WPA',
 ]);
-const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','wOBACON','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
+const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','xwOBA','xwOBACON','xSLG','Barrel%','BarrelPA%','Barrels','HardHit%','HardHit','EV','maxEV','CoLev_scaled',
   'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
   'ExpDamage','PitchTypeProb','StuffPro','PitchPro',
   // Swing timing: on-time/perfect/centered/lined-up contact is bad for pitchers
