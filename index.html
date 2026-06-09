@@ -2919,7 +2919,9 @@ const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','SL
   'ExpDamage','PitchTypeProb','StuffPro','PitchPro',
   // Swing timing: on-time/perfect/centered/lined-up contact is bad for pitchers
   'OnTime%','Perfect%','Centered%','LinedUp%']);
-const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS','SwStr%']);
+const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS','SwStr%',
+  // Swing timing: being early, late, flailing, tied-up, over, or under is bad for hitters
+  'Early%','Late%','Flailed%','TiedUp%','Over%','Under%','MissDist']);
 
 function lowerIsBetter(key) {
   const bk = baseKey(key);
