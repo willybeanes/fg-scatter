@@ -1969,11 +1969,20 @@ async function generate() {
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
       p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
-      p['R/G']  = (p.G || 0) > 0 ? p.R / p.G : null;
-      p['RA/G'] = (p.G || 0) > 0 ? p.R / p.G : null;
+      // In team mode, G = sum of individual player games (not team games played).
+      // Use GS (= team games for pitchers) or PA/38.15 (estimate for hitters) instead.
+      const _G = p._isTeam ? (isHitting ? p.PA / 38.15 : (p.GS || p.IP / 9)) : p.G;
+      p['R/G']  = (_G || 0) > 0 ? p.R / _G : null;
+      p['RA/G'] = (_G || 0) > 0 ? p.R / _G : null;
       // Combined mode: prefixed versions for hit_R/G and pit_RA/G
-      if (p['hit_G'] != null) p['hit_R/G']  = (p['hit_G'] || 0) > 0 ? p['hit_R'] / p['hit_G'] : null;
-      if (p['pit_G'] != null) p['pit_RA/G'] = (p['pit_G'] || 0) > 0 ? p['pit_R'] / p['pit_G'] : null;
+      if (p['hit_G'] != null) {
+        const _hitG = p._isTeam ? p['hit_PA'] / 38.15 : p['hit_G'];
+        p['hit_R/G'] = (_hitG || 0) > 0 ? p['hit_R'] / _hitG : null;
+      }
+      if (p['pit_G'] != null) {
+        const _pitG = p._isTeam ? (p['pit_GS'] || p['pit_IP'] / 9) : p['pit_G'];
+        p['pit_RA/G'] = (_pitG || 0) > 0 ? p['pit_R'] / _pitG : null;
+      }
       // wOBACON = wOBA restricted to contact (no BB/HBP in numerator or denominator)
       // Weights from FanGraphs Guts (2024): 1B=0.882, 2B=1.254, 3B=1.590, HR=2.050
       // Denominator: AB - SO + SF  (balls put in play incl. HR and sac flies)
@@ -2015,10 +2024,17 @@ async function generate() {
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
               p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
-              p['R/G']  = (p.G || 0) > 0 ? p.R / p.G : null;
-              p['RA/G'] = (p.G || 0) > 0 ? p.R / p.G : null;
-              if (p['hit_G'] != null) p['hit_R/G']  = (p['hit_G'] || 0) > 0 ? p['hit_R'] / p['hit_G'] : null;
-              if (p['pit_G'] != null) p['pit_RA/G'] = (p['pit_G'] || 0) > 0 ? p['pit_R'] / p['pit_G'] : null;
+              const _G = p._isTeam ? (isHitting ? p.PA / 38.15 : (p.GS || p.IP / 9)) : p.G;
+              p['R/G']  = (_G || 0) > 0 ? p.R / _G : null;
+              p['RA/G'] = (_G || 0) > 0 ? p.R / _G : null;
+              if (p['hit_G'] != null) {
+                const _hitG = p._isTeam ? p['hit_PA'] / 38.15 : p['hit_G'];
+                p['hit_R/G'] = (_hitG || 0) > 0 ? p['hit_R'] / _hitG : null;
+              }
+              if (p['pit_G'] != null) {
+                const _pitG = p._isTeam ? (p['pit_GS'] || p['pit_IP'] / 9) : p['pit_G'];
+                p['pit_RA/G'] = (_pitG || 0) > 0 ? p['pit_R'] / _pitG : null;
+              }
               const _wOBACON_d = (p.AB || 0) - (p.SO || 0) + (p.SF || 0);
               p['wOBACON'] = _wOBACON_d > 0
                 ? (0.882*(p['1B']||0) + 1.254*(p['2B']||0) + 1.590*(p['3B']||0) + 2.050*(p.HR||0)) / _wOBACON_d
