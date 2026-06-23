@@ -1043,7 +1043,7 @@ const STAT_GROUPS_PITCHING = [
     { key: 'GS', label: 'GS' }, { key: 'CG', label: 'CG' }, { key: 'ShO', label: 'ShO' },
     { key: 'SV', label: 'SV' }, { key: 'HLD', label: 'HLD' }, { key: 'SV+HLD', label: 'SV+HLD' }, { key: 'SV+HLD+W', label: 'SV+HLD+W' }, { key: 'BS', label: 'BS' },
     { key: 'IP', label: 'IP' }, { key: 'TBF', label: 'TBF' }, { key: 'H', label: 'H' },
-    { key: 'R', label: 'R' }, { key: 'ER', label: 'ER' }, { key: 'HR', label: 'HR' },
+    { key: 'R', label: 'R' }, { key: 'RA/G', label: 'RA/G' }, { key: 'ER', label: 'ER' }, { key: 'HR', label: 'HR' },
     { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' }, { key: 'HBP', label: 'HBP' },
     { key: 'WP', label: 'WP' }, { key: 'BK', label: 'BK' }, { key: 'SO', label: 'SO' },
     { key: 'GB', label: 'GB' }, { key: 'FB', label: 'FB' }, { key: 'LD', label: 'LD' },
@@ -1158,7 +1158,7 @@ const STAT_GROUPS_HITTING = [
   { group: 'Counting', stats: [
     { key: 'G', label: 'G' }, { key: 'AB', label: 'AB' }, { key: 'PA', label: 'PA' },
     { key: 'H', label: 'H' }, { key: '1B', label: '1B' }, { key: '2B', label: '2B' },
-    { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' }, { key: 'XBH', label: 'XBH' }, { key: 'R', label: 'R' },
+    { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' }, { key: 'XBH', label: 'XBH' }, { key: 'R', label: 'R' }, { key: 'R/G', label: 'R/G' },
     { key: 'RBI', label: 'RBI' }, { key: 'BB', label: 'BB' }, { key: 'IBB', label: 'IBB' },
     { key: 'SO', label: 'SO' }, { key: 'HBP', label: 'HBP' }, { key: 'TOB', label: 'TOB' },
     { key: 'SF', label: 'SF' }, { key: 'SH', label: 'SH' }, { key: 'GDP', label: 'GDP' },
@@ -1969,6 +1969,8 @@ async function generate() {
       p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
       p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
+      p['R/G']  = (p.G || 0) > 0 ? p.R / p.G : null;
+      p['RA/G'] = (p.G || 0) > 0 ? p.R / p.G : null;
       // wOBACON = wOBA restricted to contact (no BB/HBP in numerator or denominator)
       // Weights from FanGraphs Guts (2024): 1B=0.882, 2B=1.254, 3B=1.590, HR=2.050
       // Denominator: AB - SO + SF  (balls put in play incl. HR and sac flies)
@@ -2010,6 +2012,8 @@ async function generate() {
               p['SB+CS'] = (p.SB || 0) + (p.CS || 0);
               p['XBH']   = (p['2B'] || 0) + (p['3B'] || 0) + (p.HR || 0);
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
+              p['R/G']  = (p.G || 0) > 0 ? p.R / p.G : null;
+              p['RA/G'] = (p.G || 0) > 0 ? p.R / p.G : null;
               const _wOBACON_d = (p.AB || 0) - (p.SO || 0) + (p.SF || 0);
               p['wOBACON'] = _wOBACON_d > 0
                 ? (0.882*(p['1B']||0) + 1.254*(p['2B']||0) + 1.590*(p['3B']||0) + 2.050*(p.HR||0)) / _wOBACON_d
@@ -2918,7 +2922,8 @@ const LOWER_IS_BETTER_PITCHING = new Set(['BB%','BABIP','HBP','HR/FB','wOBA','SL
   'BatSpeed','FastSwing%','Blasts/C','Blasts/Sw','SqUp/C','SqUp/Sw','SwingLen',
   'ExpDamage','PitchTypeProb','StuffPro','PitchPro',
   // Swing timing: on-time/perfect/centered/lined-up contact is bad for pitchers
-  'OnTime%','Perfect%','Centered%','LinedUp%']);
+  'OnTime%','Perfect%','Centered%','LinedUp%',
+  'RA/G']);
 const LOWER_IS_BETTER_HITTING  = new Set(['K%','GDP','CS','SwStr%',
   // Swing timing: being early, late, flailing, tied-up, over, or under is bad for hitters
   'Early%','Late%','Flailed%','TiedUp%','Over%','Under%','MissDist']);
