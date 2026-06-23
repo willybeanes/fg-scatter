@@ -1971,6 +1971,9 @@ async function generate() {
       p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
       p['R/G']  = (p.G || 0) > 0 ? p.R / p.G : null;
       p['RA/G'] = (p.G || 0) > 0 ? p.R / p.G : null;
+      // Combined mode: prefixed versions for hit_R/G and pit_RA/G
+      if (p['hit_G'] != null) p['hit_R/G']  = (p['hit_G'] || 0) > 0 ? p['hit_R'] / p['hit_G'] : null;
+      if (p['pit_G'] != null) p['pit_RA/G'] = (p['pit_G'] || 0) > 0 ? p['pit_R'] / p['pit_G'] : null;
       // wOBACON = wOBA restricted to contact (no BB/HBP in numerator or denominator)
       // Weights from FanGraphs Guts (2024): 1B=0.882, 2B=1.254, 3B=1.590, HR=2.050
       // Denominator: AB - SO + SF  (balls put in play incl. HR and sac flies)
@@ -2014,6 +2017,8 @@ async function generate() {
               p['TOB'] = (p.H || 0) + (p.BB || 0) + (p.HBP || 0);
               p['R/G']  = (p.G || 0) > 0 ? p.R / p.G : null;
               p['RA/G'] = (p.G || 0) > 0 ? p.R / p.G : null;
+              if (p['hit_G'] != null) p['hit_R/G']  = (p['hit_G'] || 0) > 0 ? p['hit_R'] / p['hit_G'] : null;
+              if (p['pit_G'] != null) p['pit_RA/G'] = (p['pit_G'] || 0) > 0 ? p['pit_R'] / p['pit_G'] : null;
               const _wOBACON_d = (p.AB || 0) - (p.SO || 0) + (p.SF || 0);
               p['wOBACON'] = _wOBACON_d > 0
                 ? (0.882*(p['1B']||0) + 1.254*(p['2B']||0) + 1.590*(p['3B']||0) + 2.050*(p.HR||0)) / _wOBACON_d
