@@ -412,6 +412,8 @@
             <option value="33">Last 14 Days</option>
             <option value="35">Last 21 Days</option>
             <option value="34">Last 30 Days</option>
+            <option value="38">Last 60 Days</option>
+            <option value="39">Last 90 Days</option>
             <option value="37">First Half</option>
             <option value="36">Second Half</option>
             <option value="31">March/April</option>
@@ -718,6 +720,8 @@ function getSavantDateRange(month, season) {
     case '33': return { dateGt: daysAgo(14), dateLt: tomorrow() };      // Last 14 days
     case '35': return { dateGt: daysAgo(21), dateLt: tomorrow() };      // Last 21 days
     case '34': return { dateGt: daysAgo(30), dateLt: tomorrow() };      // Last 30 days
+    case '38': return { dateGt: daysAgo(60), dateLt: tomorrow() };      // Last 60 days
+    case '39': return { dateGt: daysAgo(90), dateLt: tomorrow() };      // Last 90 days
     default:   return null;
   }
 }
@@ -738,6 +742,8 @@ function getPrevPeriodFGParams(splitValue, season) {
     case '33': return { month: '1000', startdate: daysAgo(28),  enddate: daysAgo(14) };    // L14 → prior 14
     case '35': return { month: '1000', startdate: daysAgo(42),  enddate: daysAgo(21) };    // L21 → prior 21
     case '34': return { month: '1000', startdate: daysAgo(60),  enddate: daysAgo(30) };    // L30 → prior 30
+    case '38': return { month: '1000', startdate: daysAgo(120), enddate: daysAgo(60) };    // L60 → prior 60
+    case '39': return { month: '1000', startdate: daysAgo(180), enddate: daysAgo(90) };    // L90 → prior 90
     default:   return null; // Full season, Mar/Apr, 1st Half — no prior period available
   }
 }
@@ -758,6 +764,8 @@ function getPrevPeriodSavantDateRange(splitValue, season) {
     case '33': return { dateGt: daysAgo(28), dateLt: daysAgo(14) };
     case '35': return { dateGt: daysAgo(42), dateLt: daysAgo(21) };
     case '34': return { dateGt: daysAgo(60), dateLt: daysAgo(30) };
+    case '38': return { dateGt: daysAgo(120), dateLt: daysAgo(60) };
+    case '39': return { dateGt: daysAgo(180), dateLt: daysAgo(90) };
     default:   return null;
   }
 }
@@ -775,6 +783,8 @@ function getPrevPeriodLabel(splitValue) {
     case '33': return 'Prior 14d';
     case '35': return 'Prior 21d';
     case '34': return 'Prior 30d';
+    case '38': return 'Prior 60d';
+    case '39': return 'Prior 90d';
     default:   return null;
   }
 }
@@ -800,6 +810,8 @@ function getFGSplitParams(splitValue, season) {
     case '33': return { month: '1000', startdate: daysAgo(14),  enddate: today };           // Last 14 days
     case '35': return { month: '1000', startdate: daysAgo(21),  enddate: today };           // Last 21 days
     case '34': return { month: '1000', startdate: daysAgo(30),  enddate: today };           // Last 30 days
+    case '38': return { month: '1000', startdate: daysAgo(60),  enddate: today };           // Last 60 days
+    case '39': return { month: '1000', startdate: daysAgo(90),  enddate: today };           // Last 90 days
     case '37': return { month: '1000', startdate: `${yr}-03-01`, enddate: `${yr}-07-12` }; // First Half
     case '36': return { month: '1000', startdate: `${yr}-07-12`, enddate: `${yr}-11-01` }; // Second Half
     default:   return { month: '0' }; // Fall back to full season rather than passing a bad value
