@@ -291,6 +291,47 @@
       z-index: 50;
     }
     .plot-area { cursor: crosshair; }
+    /* Player search highlight */
+    .plot-area.search-active .player-dot:not(.search-match) {
+      opacity: 0.1;
+      filter: grayscale(1);
+      transition: opacity 0.15s, filter 0.15s;
+    }
+    .plot-area.search-active .dot-ring:not(.search-match) {
+      opacity: 0.1;
+      transition: opacity 0.15s;
+    }
+    .plot-area.search-active .player-dot.search-match {
+      z-index: 20;
+    }
+    #player-search-wrap {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      margin: 0 14px;
+    }
+    #player-search-wrap span {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #999;
+      white-space: nowrap;
+    }
+    #inp-player-search {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 10px;
+      border: 1px solid #d8d5d0;
+      border-radius: 6px;
+      background: #fff;
+      color: #333;
+      width: 180px;
+      outline: none;
+    }
+    #inp-player-search:focus { border-color: #aaa; }
+
     /* Player dots */
     .player-dot {
       position: absolute;
@@ -549,11 +590,17 @@
     </div>
     <div id="below-chart-row" style="margin-top:12px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div id="size-toggle" style="display:none;gap:2px;display:none;">
-          <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
-          <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
-          <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
-          <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
+        <div style="display:flex;align-items:center;gap:0;">
+          <div id="size-toggle" style="display:none;gap:2px;display:none;">
+            <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-right:6px;line-height:26px;">Size</span>
+            <button class="size-btn" data-scale="1.0" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px 0 0 6px;cursor:pointer;border-right:none;">S</button>
+            <button class="size-btn active" data-scale="1.4" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#1a1a1a;color:#fff;border:1px solid #d8d5d0;border-radius:0;cursor:pointer;border-right:none;">M</button>
+            <button class="size-btn" data-scale="1.9" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 10px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:0 6px 6px 0;cursor:pointer;">L</button>
+          </div>
+          <div id="player-search-wrap">
+            <span>Search</span>
+            <input id="inp-player-search" type="text" placeholder="Player name…" autocomplete="off" spellcheck="false">
+          </div>
         </div>
         <div id="export-btns" style="display:none;display:flex;gap:6px;">
           <button id="btn-download" style="font-family:inherit;font-size:11px;font-weight:500;padding:5px 14px;background:#fff;color:#555;border:1px solid #d8d5d0;border-radius:6px;cursor:pointer;">↓ Download CSV</button>
@@ -1398,8 +1445,10 @@ const selSplit = document.getElementById('sel-split');
 const btnReset = document.getElementById('btn-reset');
 const btnDownload = document.getElementById('btn-download');
 const btnPng      = document.getElementById('btn-png');
-const exportBtns  = document.getElementById('export-btns');
-const sizeToggle  = document.getElementById('size-toggle');
+const exportBtns      = document.getElementById('export-btns');
+const sizeToggle      = document.getElementById('size-toggle');
+const playerSearchWrap = document.getElementById('player-search-wrap');
+const inpPlayerSearch  = document.getElementById('inp-player-search');
 const cornerTL = document.getElementById('corner-tl');
 const cornerTR = document.getElementById('corner-tr');
 const cornerBL = document.getElementById('corner-bl');
@@ -1436,6 +1485,22 @@ document.querySelectorAll('.size-btn').forEach(btn => {
 });
 
 chkR2.addEventListener('change', () => { if (currentData) rerenderLayout(); syncUrlExtras(); });
+
+inpPlayerSearch.addEventListener('input', () => {
+  const q = inpPlayerSearch.value.trim().toLowerCase();
+  if (!q) {
+    plotArea.classList.remove('search-active');
+    plotArea.querySelectorAll('.player-dot, .dot-ring').forEach(el => el.classList.remove('search-match'));
+    return;
+  }
+  plotArea.classList.add('search-active');
+  plotArea.querySelectorAll('.player-dot, .dot-ring').forEach(el => {
+    el.classList.toggle('search-match', (el.dataset.name || '').includes(q));
+  });
+});
+inpPlayerSearch.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { inpPlayerSearch.value = ''; inpPlayerSearch.dispatchEvent(new Event('input')); }
+});
 chkRookie.addEventListener('change', () => { syncUrlExtras(); generate(); });
 
 const PITCHING_TYPE_OPTIONS = [
@@ -1547,6 +1612,7 @@ function switchMode(mode) {
   btnReset.style.display = 'none';
   exportBtns.style.display = 'none';
   sizeToggle.style.display = 'none';
+  playerSearchWrap.style.display = 'none';
 }
 
 // Init
@@ -1843,6 +1909,9 @@ async function generate() {
   btnGenerate.disabled = true;
   exportBtns.style.display = 'none';
   sizeToggle.style.display = 'none';
+  playerSearchWrap.style.display = 'none';
+  inpPlayerSearch.value = '';
+  plotArea.classList.remove('search-active');
   chartStatus.textContent = 'Loading...';
   chartStatus.classList.remove('error');
   chartStatus.style.display = 'flex';
@@ -2503,6 +2572,7 @@ async function generate() {
     chartStatus.style.display = 'none';
     exportBtns.style.display = 'flex';
     sizeToggle.style.display = 'flex';
+    playerSearchWrap.style.display = 'flex';
     rerenderLayout();
   } catch (e) {
     chartStatus.textContent = `Error: ${e.message}`;
@@ -2814,6 +2884,7 @@ function rerenderLayout() {
     dot.style.height = dotSize + 'px';
     dot.style.left = left + 'px';
     dot.style.top = top + 'px';
+    dot.dataset.name = (p.PlayerName || p.TeamNameAbb || '').toLowerCase();
 
     // Color ring
     if (colorKey) {
@@ -2837,6 +2908,7 @@ function rerenderLayout() {
           ring.style.left   = (left - ringW) + 'px';
           ring.style.top    = (top  - ringW) + 'px';
           ring.style.border = `${ringW}px solid ${ringColor(t)}`;
+          ring.dataset.name = dot.dataset.name;
           plotArea.appendChild(ring);
         }
       }
