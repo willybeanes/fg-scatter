@@ -1,0 +1,31 @@
+name: Update Hitting+
+
+on:
+  schedule:
+    # Every day at 8:30am UTC during baseball season (offset from CoLev's 8:00)
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+    # Also allow manual runs from the GitHub Actions tab
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Publish Hitting+ to Supabase
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/compute_hitting_plus.py
