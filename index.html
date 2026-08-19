@@ -1214,6 +1214,11 @@ const STAT_GROUPS_HITTING = [
     { key: 'WAR', label: 'WAR' }, { key: 'RAR', label: 'RAR' },
     { key: 'Batting', label: 'Batting' }, { key: 'Offense', label: 'Offense' },
   ]},
+  { group: 'Hitting+ (swingplus)', stats: [
+    { key: 'Hitting+',  label: 'Hitting+'  }, { key: 'Decision+', label: 'Decision+' },
+    { key: 'Timing+',   label: 'Timing+'   }, { key: 'Contact+',  label: 'Contact+'  },
+    { key: 'Power+',    label: 'Power+'    },
+  ]},
   { group: 'Counting', stats: [
     { key: 'G', label: 'G' }, { key: 'AB', label: 'AB' }, { key: 'PA', label: 'PA' },
     { key: 'H', label: 'H' }, { key: '1B', label: '1B' }, { key: '2B', label: '2B' },
@@ -1832,6 +1837,11 @@ async function fetchBPArsenal(season) {
 // Source: BP leaderboards/api/v1/hitting, matched via mlbid = xMLBAMID
 const BP_HITTING_KEYS = new Set(['SLGCON','EV90','BP_SEAGER']);
 const _bpHittingCache = new Map();
+
+// ── Hitting+ (swingplus) grades ─────────────────────────────────────────────
+// Published by the Hitting+ engine, mirrored into Supabase (table `hitting_plus`)
+// with an MLBAM id so it matches FanGraphs rows by xMLBAMID. Full-season only.
+const HITTING_PLUS_KEYS = new Set(['Hitting+','Decision+','Timing+','Contact+','Power+']);
 
 async function fetchBPHitting(season) {
   if (_bpHittingCache.has(season)) return _bpHittingCache.get(season);
@@ -2515,6 +2525,34 @@ async function generate() {
       }
     }
 
+    // Hitting+ (swingplus) enrichment — hitter mode, full-season only, matched by MLBAM ID.
+    // The engine only publishes full-season grades, so leave them blank on date-range splits.
+    if (isHitting && !isTeam && selSplit.value === '0' && axisKeys.some(k => HITTING_PLUS_KEYS.has(baseKey(k)))) {
+      try {
+        const hpResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/hitting_plus?season=eq.${season}&select=mlbamid,hitting_plus,decision,timing,contact,power`,
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+        );
+        if (hpResp.ok) {
+          const hpData = await hpResp.json();
+          const hpById = new Map();
+          for (const row of hpData) {
+            if (row.mlbamid != null) hpById.set(String(row.mlbamid), row);
+          }
+          for (const p of currentData) {
+            const row = hpById.get(String(p.xMLBAMID || ''));
+            p['Hitting+']  = row?.hitting_plus ?? null;
+            p['Decision+'] = row?.decision     ?? null;
+            p['Timing+']   = row?.timing       ?? null;
+            p['Contact+']  = row?.contact      ?? null;
+            p['Power+']    = row?.power         ?? null;
+          }
+        }
+      } catch (hpErr) {
+        console.warn('Hitting+ fetch failed:', hpErr.message);
+      }
+    }
+
     // CoLev enrichment — pitcher mode only, matched by MLBAM ID then normalized name
     const COLEV_KEYS = new Set(['CoLev', 'CoLev_scaled', 'CoLev_dRE']);
     if (!isHitting && !isTeam && axisKeys.some(k => COLEV_KEYS.has(baseKey(k)))) {
@@ -3059,7 +3097,8 @@ function formatStat(v, key) {
   if (['ERA','FIP','xFIP','SIERA','xERA','WHIP','HR/9','BB/9','K/9','H/9','K/BB','GB/FB','Spd','BB/K'].includes(bk)) return v.toFixed(2);
   if (['WAR','IP','Start-IP','Relief-IP','WPA','-WPA','+WPA','Starting','Relieving','RAR','Batting','Offense','BaseRunning','RE24','Clutch','Dollars','EV','EV50','EV90','LA','maxEV','SprintSpeed','wRAA','wRC','BatSpeed','SwingLen','AttackAngle','AttackDir','SwingTilt',
        'StuffPro','PitchPro','SurpriseFactor','MovementSpread','VelocitySpread','PitchTypeProb','ExpDamage','BP_SEAGER'].includes(bk)) return v.toFixed(1);
-  if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+'].includes(bk)) return Math.round(v);
+  if (['ERA-','FIP-','xFIP-','sp_stuff','sp_location','sp_pitching','wRC+','AVG+','BB%+','K%+','OBP+','SLG+','ISO+','BABIP+',
+       'Hitting+','Decision+','Timing+','Contact+','Power+'].includes(bk)) return Math.round(v);
   if (bk.startsWith('pfxv')) return v.toFixed(1);
   if (['Age'].includes(bk)) return v.toFixed(0);
   if (COUNTING_KEYS.has(bk)) return Math.round(v);
