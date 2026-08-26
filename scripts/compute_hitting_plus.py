@@ -76,9 +76,10 @@ def main():
     players = data["players"]
     print(f"      {len(players)} player-seasons, {len(info)} resolved names")
 
-    # ── 2. Join each player-season to an MLBAM id and team ───────────────────────
+    # ── 2. Join each player-season to an MLBAM id, keeping team+pa for team agg ──
     print("[2/3] Joining to MLBAM ids...")
-    records = []
+    records = []       # rows for hitting_plus table (no team/pa — schema unchanged)
+    enriched = []      # full rows including team+pa for team aggregation
     missing = set()
     for p in players:
         name = p.get("player_name")
@@ -89,19 +90,21 @@ def main():
             continue
         season = int(p["game_year"])
         team = team_for_season(entry, season) if entry else None
+        pa = int(p.get("pa") or 0)
         row = {
             "name": name,
             "mlbamid": int(mlbamid),
             "season": season,
-            "team": team,
-            "pa": int(p.get("pa") or 0),
         }
+        grades = {}
         for grade, col in GRADE_COLUMNS.items():
-            row[col] = clean(p.get(grade))
+            grades[col] = clean(p.get(grade))
+        row.update(grades)
         records.append(row)
+        enriched.append({**row, "team": team, "pa": pa, **grades})
     print(f"      {len(records)} rows to upsert ({len(missing)} names without an MLBAM id)")
 
-    # ── 3. Upsert player rows to Supabase ────────────────────────────────────────
+    # ── 3. Upsert player rows to Supabase (existing schema, no new columns) ──────
     print(f"[3/3a] Upserting {len(records)} player rows to Supabase...")
     sb = create_client(SUPABASE_URL, SUPABASE_KEY)
     CHUNK = 500
@@ -115,9 +118,8 @@ def main():
     # ── 4. Compute and upsert PA-weighted team averages ───────────────────────────
     print("[3/3b] Computing team averages...")
     from collections import defaultdict
-    # group by (season, team)
     team_buckets: dict[tuple, list] = defaultdict(list)
-    for r in records:
+    for r in enriched:
         if r["team"] and r["pa"] and r["pa"] > 0:
             team_buckets[(r["season"], r["team"])].append(r)
 
