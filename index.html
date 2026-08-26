@@ -2525,27 +2525,55 @@ async function generate() {
       }
     }
 
-    // Hitting+ (swingplus) enrichment — hitter mode, full-season only, matched by MLBAM ID.
+    // Hitting+ (swingplus) enrichment — hitter mode, full-season only.
     // The engine only publishes full-season grades, so leave them blank on date-range splits.
-    if (isHitting && !isTeam && selSplit.value === '0' && axisKeys.some(k => HITTING_PLUS_KEYS.has(baseKey(k)))) {
+    if (isHitting && selSplit.value === '0' && axisKeys.some(k => HITTING_PLUS_KEYS.has(baseKey(k)))) {
       try {
-        const hpResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/hitting_plus?season=eq.${season}&select=mlbamid,hitting_plus,decision,timing,contact,power`,
-          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
-        );
-        if (hpResp.ok) {
-          const hpData = await hpResp.json();
-          const hpById = new Map();
-          for (const row of hpData) {
-            if (row.mlbamid != null) hpById.set(String(row.mlbamid), row);
+        if (!isTeam) {
+          // Player mode: match by MLBAM ID
+          const hpResp = await fetch(
+            `${SUPABASE_URL}/rest/v1/hitting_plus?season=eq.${season}&select=mlbamid,hitting_plus,decision,timing,contact,power`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+          );
+          if (hpResp.ok) {
+            const hpData = await hpResp.json();
+            const hpById = new Map();
+            for (const row of hpData) {
+              if (row.mlbamid != null) hpById.set(String(row.mlbamid), row);
+            }
+            for (const p of currentData) {
+              const row = hpById.get(String(p.xMLBAMID || ''));
+              p['Hitting+']  = row?.hitting_plus ?? null;
+              p['Decision+'] = row?.decision     ?? null;
+              p['Timing+']   = row?.timing       ?? null;
+              p['Contact+']  = row?.contact      ?? null;
+              p['Power+']    = row?.power         ?? null;
+            }
           }
-          for (const p of currentData) {
-            const row = hpById.get(String(p.xMLBAMID || ''));
-            p['Hitting+']  = row?.hitting_plus ?? null;
-            p['Decision+'] = row?.decision     ?? null;
-            p['Timing+']   = row?.timing       ?? null;
-            p['Contact+']  = row?.contact      ?? null;
-            p['Power+']    = row?.power         ?? null;
+        } else {
+          // Team mode: fetch pre-aggregated team averages from hitting_plus_teams.
+          // The table stores Savant-style abbreviations; FG_TO_SAVANT_TEAM converts
+          // FanGraphs abbrevs to Savant so we can match.
+          const hpResp = await fetch(
+            `${SUPABASE_URL}/rest/v1/hitting_plus_teams?season=eq.${season}&select=team,hitting_plus,decision,timing,contact,power`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+          );
+          if (hpResp.ok) {
+            const hpData = await hpResp.json();
+            // index by Savant team abbrev
+            const hpByTeam = new Map();
+            for (const row of hpData) {
+              if (row.team) hpByTeam.set(row.team, row);
+            }
+            for (const p of currentData) {
+              const savantAbbr = FG_TO_SAVANT_TEAM[p.TeamNameAbb] ?? p.TeamNameAbb;
+              const row = hpByTeam.get(savantAbbr);
+              p['Hitting+']  = row?.hitting_plus ?? null;
+              p['Decision+'] = row?.decision     ?? null;
+              p['Timing+']   = row?.timing       ?? null;
+              p['Contact+']  = row?.contact      ?? null;
+              p['Power+']    = row?.power         ?? null;
+            }
           }
         }
       } catch (hpErr) {
