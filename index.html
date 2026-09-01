@@ -1473,6 +1473,7 @@ function syncUrlExtras() {
   if (chkR2.checked) urlP.set('r2', '1'); else urlP.delete('r2');
   if (chkRookie.checked) urlP.set('rookie', '1'); else urlP.delete('rookie');
   history.replaceState(null, '', '?' + urlP.toString());
+  try { window.parent.postMessage({ type: 'bh:urlSync', search: '?' + urlP.toString() }, '*'); } catch(_) {}
 }
 
 document.querySelectorAll('.size-btn').forEach(btn => {
@@ -1915,6 +1916,7 @@ async function generate() {
   if (chkR2.checked) urlState.set('r2', '1');
   if (chkRookie.checked) urlState.set('rookie', '1');
   history.replaceState(null, '', '?' + urlState.toString());
+  try { window.parent.postMessage({ type: 'bh:urlSync', search: '?' + urlState.toString() }, '*'); } catch(_) {}
 
   btnGenerate.disabled = true;
   exportBtns.style.display = 'none';
