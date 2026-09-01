@@ -1,9 +1,4 @@
 {
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "destination": "https://baseball-hopper.vercel.app/scatter",
-      "permanent": false
-    }
-  ]
+  "buildCommand": "sed 's|YOUR_PROJECT_HOST|'\"$SUPABASE_URL\"'|g; s|YOUR_ANON_KEY|'\"$SUPABASE_ANON_KEY\"'|g' index.html > _index.html && mv _index.html index.html",
+  "outputDirectory": "."
 }
