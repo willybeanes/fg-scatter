@@ -433,7 +433,9 @@
     body.embed-mode { background: transparent; padding: 0; }
     body.embed-mode .tab-bar,
     body.embed-mode .controls-card,
-    body.embed-mode #below-chart-row { display: none !important; }
+    body.embed-mode #below-chart-row,
+    body.embed-mode #clear-labels-wrap,
+    body.embed-mode footer { display: none !important; }
     body.embed-mode .chart-card {
       border-radius: 0;
       border: none;
@@ -642,7 +644,7 @@
       </div>
     </div>
   </div>
-  <div style="text-align:center;margin-top:8px;">
+  <div id="clear-labels-wrap" style="text-align:center;margin-top:8px;">
     <button id="btn-clear-labels" style="font-family:inherit;font-size:11px;font-weight:500;padding:4px 14px;background:none;color:#bbb;border:1px solid #e0ddd8;border-radius:6px;cursor:pointer;">Clear Labels</button>
   </div>
   <div class="split-warning" id="split-warning"></div>
