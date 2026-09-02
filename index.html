@@ -430,6 +430,20 @@
       pointer-events: none;
     }
     .split-warning.visible { opacity: 1; }
+    body.embed-mode { background: transparent; padding: 0; }
+    body.embed-mode .tab-bar,
+    body.embed-mode .controls-card,
+    body.embed-mode #below-chart-row { display: none !important; }
+    body.embed-mode .chart-card {
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+      padding: 16px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    body.embed-mode .chart-area { flex: 1; }
   </style>
 </head>
 <body>
@@ -1657,8 +1671,11 @@ function switchMode(mode) {
   });
   ro.observe(chartArea);
 
-  // Load state from URL params and auto-generate
+  // Embed mode: hide controls, show only chart
   const urlP = new URLSearchParams(window.location.search);
+  if (urlP.get('embed') === '1') document.body.classList.add('embed-mode');
+
+  // Load state from URL params and auto-generate
   if (urlP.get('mode') === 'hitting') switchMode('hitting');
   if (urlP.get('mode') === 'combined') switchMode('combined');
   if (urlP.has('season')) selSeason.value = urlP.get('season');
