@@ -834,6 +834,25 @@ function getPrevPeriodSavantDateRange(splitValue, season) {
   }
 }
 
+// Returns a short human-readable label for the CURRENT split period.
+function getCurrentPeriodLabel(splitValue) {
+  switch (String(splitValue)) {
+    case '2':  return 'May';
+    case '3':  return 'June';
+    case '4':  return 'July';
+    case '5':  return 'Aug';
+    case '6':  return 'Sept/Oct';
+    case '36': return '2nd Half';
+    case '32': return 'Last 7d';
+    case '33': return 'Last 14d';
+    case '35': return 'Last 21d';
+    case '34': return 'Last 30d';
+    case '38': return 'Last 60d';
+    case '39': return 'Last 90d';
+    default:   return null;
+  }
+}
+
 // Returns a short human-readable label for the period BEFORE the given split.
 function getPrevPeriodLabel(splitValue) {
   switch (String(splitValue)) {
@@ -2707,7 +2726,13 @@ function rerenderLayout() {
     : yKey === '__prev_period__'
     ? `${currentPrevPeriodLabel ?? 'Prev Period'} ${xLabel}`
     : (STAT_OPTIONS.find(s => s.key === yKey)?.label || yKey);
-  axisLabelX.textContent = xLabel;
+  const curPeriodLabel = getCurrentPeriodLabel(selSplit.value);
+  const xAxisLabel = (yKey === '__prev_period__' && curPeriodLabel)
+    ? `${curPeriodLabel} ${xLabel}`
+    : yKey === '__prev_year__'
+    ? `${selSeason.value} ${xLabel}`
+    : xLabel;
+  axisLabelX.textContent = xAxisLabel;
   axisLabelY.textContent = yLabel;
 
   // Compute full data ranges
