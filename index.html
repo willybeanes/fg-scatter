@@ -507,7 +507,7 @@
           </select>
         </div>
         <div class="control-group">
-          <label>Min IP</label>
+          <label>Min IP<span id="qual-hint" style="font-weight:400;color:#888;margin-left:4px;font-size:11px;"></span></label>
           <select id="sel-qual">
             <option value="y">Qualified</option>
             <option value="0">0</option>
@@ -1645,7 +1645,9 @@ function switchMode(mode) {
     selQual.disabled = false;
     selQual.style.opacity = '1';
   }
-  // Clear chart
+  // Clear chart + qual hint
+  const _qh = document.getElementById('qual-hint');
+  if (_qh) _qh.textContent = '';
   currentData = null;
   plotArea.innerHTML = '';
   chartStatus.textContent = 'Select options and click Generate';
@@ -2277,6 +2279,56 @@ async function generate() {
               }
             }
 
+            // If X is a Hitting+ stat, enrich prev year players from Supabase hitting_plus table
+            if (isHitting && HITTING_PLUS_KEYS.has(xBkPrev)) {
+              try {
+                if (!isTeam) {
+                  const hpResp = await fetch(
+                    `${SUPABASE_URL}/rest/v1/hitting_plus?season=eq.${prevSeason}&select=mlbamid,hitting_plus,decision,timing,contact,power`,
+                    { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+                  );
+                  if (hpResp.ok) {
+                    const hpData = await hpResp.json();
+                    const hpById = new Map();
+                    for (const row of hpData) {
+                      if (row.mlbamid != null) hpById.set(String(row.mlbamid), row);
+                    }
+                    for (const p of prevPlayers) {
+                      const row = hpById.get(String(p.xMLBAMID || ''));
+                      p['Hitting+']  = row?.hitting_plus ?? null;
+                      p['Decision+'] = row?.decision     ?? null;
+                      p['Timing+']   = row?.timing       ?? null;
+                      p['Contact+']  = row?.contact      ?? null;
+                      p['Power+']    = row?.power         ?? null;
+                    }
+                  }
+                } else {
+                  const hpResp = await fetch(
+                    `${SUPABASE_URL}/rest/v1/hitting_plus_teams?season=eq.${prevSeason}&select=team,hitting_plus,decision,timing,contact,power`,
+                    { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+                  );
+                  if (hpResp.ok) {
+                    const hpData = await hpResp.json();
+                    const hpByTeam = new Map();
+                    for (const row of hpData) {
+                      if (row.team) hpByTeam.set(row.team, row);
+                    }
+                    for (const p of prevPlayers) {
+                      const savantAbbr = FG_TO_SAVANT_TEAM[p.TeamNameAbb] ?? p.TeamNameAbb;
+                      const row = hpByTeam.get(savantAbbr);
+                      p['Hitting+']  = row?.hitting_plus ?? null;
+                      p['Decision+'] = row?.decision     ?? null;
+                      p['Timing+']   = row?.timing       ?? null;
+                      p['Contact+']  = row?.contact      ?? null;
+                      p['Power+']    = row?.power         ?? null;
+                    }
+                  }
+                }
+              } catch (hpPrevErr) {
+                console.warn('Prev year Hitting+ fetch failed:', hpPrevErr.message);
+              }
+            }
+
             // Post-Savant derived stats (same as main flow)
             for (const p of prevPlayers) {
               p['BarrelPA%'] = (p.PA || 0) > 0 ? (p.Barrels || 0) / (p.PA || 0) : null;
@@ -2676,6 +2728,20 @@ async function generate() {
     currentXKey = selX.value;
     currentYKey = selY.value;
     currentColorKey = selColor.value;
+
+    // Show the empirical min PA/IP when qual=y so the user can see the threshold
+    const qualHint = document.getElementById('qual-hint');
+    if (qualHint) {
+      if (selQual.value === 'y' && currentData && currentData.length && currentGroupBy !== 'team') {
+        const isHit = selMode.value === 'hitting';
+        const volKey = isHit ? 'PA' : 'IP';
+        const minVol = Math.min(...currentData.map(p => p[volKey] ?? Infinity).filter(v => isFinite(v)));
+        qualHint.textContent = isFinite(minVol) ? `(min ${isHit ? Math.round(minVol) : minVol.toFixed(1)} ${volKey})` : '';
+      } else {
+        qualHint.textContent = '';
+      }
+    }
+
     chartStatus.style.display = 'none';
     exportBtns.style.display = 'flex';
     sizeToggle.style.display = 'flex';
@@ -3312,7 +3378,9 @@ function downloadCSV() {
   // Header row
   const isPrevYear   = currentYKey === '__prev_year__';
   const isPrevPeriod = currentYKey === '__prev_period__';
-  const headers = isTeamMode ? ['Team'] : ['Name', 'Team'];
+  const isHitting = currentMode === 'hitting';
+  const volKey = isHitting ? 'PA' : 'IP';
+  const headers = isTeamMode ? ['Team'] : ['Name', 'Team', volKey];
   headers.push(xLabel, yLabel);
   if (isPrevYear || isPrevPeriod) headers.push('Delta');
   if (colorLabel) headers.push(colorLabel);
@@ -3323,8 +3391,14 @@ function downloadCSV() {
     const xv = p[currentXKey], yv = p[currentYKey];
     if (xv == null || !isFinite(xv) || yv == null || !isFinite(yv)) continue;
     const cols = [];
-    if (!isTeamMode) cols.push(JSON.stringify(p.PlayerName || ''));
-    cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
+    if (!isTeamMode) {
+      cols.push(JSON.stringify(p.PlayerName || ''));
+      cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
+      const vol = p[volKey];
+      cols.push(vol != null && isFinite(vol) ? (isHitting ? Math.round(vol) : parseFloat(vol).toFixed(1)) : '');
+    } else {
+      cols.push(JSON.stringify(p.TeamNameAbb || p.TeamName || ''));
+    }
     cols.push(formatStat(displayVal(xv, currentXKey), currentXKey));
     cols.push(formatStat(displayVal(yv, currentYKey), currentYKey));
     if (isPrevYear || isPrevPeriod) {
