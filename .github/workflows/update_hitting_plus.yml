@@ -3,7 +3,7 @@ name: Update Hitting+
 on:
   schedule:
     # Every day at 8:30am UTC during baseball season (offset from CoLev's 8:00)
-    - cron: '30 8 * * *'
+    - cron: '30 8 * 3-10 *'
   workflow_dispatch:
     # Also allow manual runs from the GitHub Actions tab
 
